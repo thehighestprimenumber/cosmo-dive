@@ -91,7 +91,8 @@ def main():
                 print(f"tapped: {rest[0]}")
                 return
             w, h = screen_size()
-            adb("shell", "input", "swipe", str(w // 2), str(h * 3 // 4), str(w // 2), str(h // 4), "300")
+            # Mid-screen, above where a keyboard would be.
+            adb("shell", "input", "swipe", str(w // 2), str(h * 55 // 100), str(w // 2), str(h * 20 // 100), "300")
             time.sleep(1)
         wait(rest[0], 1)
     elif cmd == "tap-input":

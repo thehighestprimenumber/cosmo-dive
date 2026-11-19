@@ -18,7 +18,8 @@ alive "choosing demo data"
 
 $UI tap-input 0
 adb shell input text 40
-adb shell input keyevent 111 # hide keyboard
+# Hide the keyboard (BACK only while it is showing, so we don't leave the screen).
+if adb shell dumpsys input_method | grep -q "mInputShown=true"; then adb shell input keyevent 4; sleep 1; fi
 $UI wait "Estimated max heart rate"
 $UI shot 02-onboarding-filled
 
