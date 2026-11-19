@@ -53,6 +53,8 @@ export type GoalMeta = {
    * you woke up) lets today's goal be redone once last night's sleep is in.
    */
   readiness?: 'low' | 'normal' | 'high' | 'unknown';
+  /** A weekly boss day: harder, worth more XP. */
+  boss?: boolean;
 };
 
 /**

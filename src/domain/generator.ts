@@ -24,8 +24,10 @@ export const PLAN_VERSION = 3;
 
 /** How far back "your typical day" looks. */
 export const LOOKBACK_DAYS = 90;
-/** Shorter activities (e.g. auto-detected errands) don't shape your baseline. */
-export const MIN_BASELINE_ACTIVITY_S = 15 * 60;
+/** A day counts as an exercise day with at least this much exercise in total. */
+export const MIN_ACTIVE_DAY_S = 15 * 60;
+/** Bin widths for finding the most common daily total. */
+const MODE_BIN = { distance: 500, duration: 5 * 60, hr_zone: 5 * 60 } as const;
 
 const PROGRESS_UP = 1.07; // hitting this goal type lately (max once a week per type)
 const EASE_OFF = 0.85; // missed two training days in a row (beyond your rest days)
@@ -68,7 +70,7 @@ export function generateGoal({ date, settings, activities, history, statuses, re
   const windowStart = addDays(date, -LOOKBACK_DAYS);
   const recent = activities.filter((a) => {
     const d = toDateKey(a.start);
-    return d >= windowStart && d < date && a.durationS >= MIN_BASELINE_ACTIVITY_S;
+    return d >= windowStart && d < date;
   });
   const past = history.filter((h) => h.date < date).sort((a, b) => (a.date < b.date ? 1 : -1));
 
@@ -103,7 +105,7 @@ export function generateGoal({ date, settings, activities, history, statuses, re
     base = DEFAULTS[kind];
     notes.push('Starter goal: not enough history for this goal type yet.');
   }
-  if (typical) notes.push(`Your typical ${typical.label}: ${fmt(typical.value)} (median of ${typical.days} days).`);
+  if (typical) notes.push(`Your most common ${typical.label}: ${fmt(typical.value)} (from ${typical.days} exercise days).`);
   else if (last?.meta) notes.push(`Continues from your last goal of this type (${fmt(last.meta.base)}).`);
 
   // 2. How it has been going. Rest days aren't misses.
@@ -181,36 +183,56 @@ export function isRecoveryWeek(date: DateKey, startDate: DateKey): boolean {
 export type Typical = { value: number; days: number; label: string };
 
 /**
- * Your typical day for a goal type: the median over days you actually did
- * that kind of thing (activities of 15+ minutes only).
- * - distance: walking days (walk km only), or riding days for ride goals
- * - duration: days with any walk or ride
- * - hr_zone: days with heart rate data
- * Needs at least 3 such days.
+ * Total exercise per day, in the goal's unit: everything you did that day
+ * added up (several short walks count together; rides count at 1/rideFactor
+ * for distance). Only days with 15+ minutes of exercise in total count.
  */
-export function baselineFor(spec: GoalSpec, recent: Activity[], settings: Settings): Typical | null {
-  const relevant = recent.filter((a) => {
-    if (a.durationS < MIN_BASELINE_ACTIVITY_S) return false;
-    if (spec.kind === 'distance') return a.sport === spec.suggestedSport && a.distanceM != null;
-    if (spec.kind === 'hr_zone') return a.hr.length >= 2;
-    return true;
-  });
+export function dailyTotals(spec: GoalSpec, recent: Activity[], settings: Settings): number[] {
   const byDay = new Map<DateKey, Activity[]>();
-  for (const a of relevant) {
+  for (const a of recent) {
     const d = toDateKey(a.start);
     byDay.set(d, [...(byDay.get(d) ?? []), a]);
   }
-  const totals = [...byDay.values()].map((acts) => measure(spec, acts, settings)).filter((v) => v > 0);
+  return [...byDay.values()]
+    .filter((acts) => acts.reduce((t, a) => t + a.durationS, 0) >= MIN_ACTIVE_DAY_S)
+    .map((acts) => measure(spec, acts, settings))
+    .filter((v) => v > 0);
+}
+
+/**
+ * Your typical day for a goal type: the mode (most common value) of your
+ * daily exercise totals over the lookback window. Needs at least 3 days.
+ */
+export function baselineFor(spec: GoalSpec, recent: Activity[], settings: Settings): Typical | null {
+  const totals = dailyTotals(spec, recent, settings);
   if (totals.length < 3) return null;
   const label =
-    spec.kind === 'distance'
-      ? spec.suggestedSport === 'walk'
-        ? 'walking day'
-        : 'riding day (as walking km)'
-      : spec.kind === 'duration'
-        ? 'active day'
-        : `day in Zone ${spec.zone}`;
-  return { value: median(totals), days: totals.length, label };
+    spec.kind === 'distance' ? 'day (walking km)' : spec.kind === 'duration' ? 'active time' : `Zone ${spec.zone} time`;
+  return { value: mostCommon(totals, MODE_BIN[spec.kind]), days: totals.length, label };
+}
+
+/**
+ * Mode of continuous values: group into bins of `bin`, take the fullest bin
+ * (ties: the one nearest the median) and return the median inside it. If no
+ * bin has more than one value, falls back to the median.
+ */
+export function mostCommon(xs: number[], bin: number): number {
+  const bins = new Map<number, number[]>();
+  for (const x of xs) {
+    const k = Math.floor(x / bin);
+    bins.set(k, [...(bins.get(k) ?? []), x]);
+  }
+  const m = median(xs);
+  let best: number[] | null = null;
+  let bestDist = Infinity;
+  for (const [k, vals] of bins) {
+    const dist = Math.abs((k + 0.5) * bin - m);
+    if (!best || vals.length > best.length || (vals.length === best.length && dist < bestDist)) {
+      best = vals;
+      bestDist = dist;
+    }
+  }
+  return best && best.length > 1 ? median(best) : m;
 }
 
 function sameType(a: GoalSpec, b: GoalSpec): boolean {

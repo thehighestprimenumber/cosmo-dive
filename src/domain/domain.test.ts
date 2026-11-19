@@ -125,21 +125,32 @@ describe('generator', () => {
     for (let i = 0; i < 60; i++) expect(kindForDay(addDays('2026-11-02', i), false)).not.toBe('hr_zone');
   });
 
-  it('starts from the median of your walking days, ignoring rides and short errands', () => {
+  it('starts from the most common total exercise per day, not the average workout', () => {
     const date = dayOfKind('distance');
     const acts: Activity[] = [];
-    const kms = [4.8, 5.2, 5.6, 6.0, 6.4, 7.0, 5.9, 6.1, 5.5, 6.3, 6.6];
-    kms.forEach((km, i) => {
-      const d = addDays(date, -(i + 1) * 3);
-      acts.push(act(d, { minutes: 70, distanceM: km * 1000 }));
-      // Same-day and separate-day errands, and a ride: none of them count.
-      acts.push(act(d, { id: `${d}-errand`, hourStart: 14, minutes: 8, distanceM: 500 }));
-      acts.push(act(addDays(d, -1), { id: `${d}-only-errand`, hourStart: 15, minutes: 9, distanceM: 600 }));
-      if (i < 3) acts.push(act(addDays(d, -2), { id: `${d}-ride`, sport: 'ride', minutes: 40, distanceM: 15000 }));
-    });
+    // 8 days around 5.5 km made of several outings, 3 short days, 1 huge day.
+    for (let i = 0; i < 8; i++) {
+      const d = addDays(date, -(i + 1) * 2);
+      acts.push(act(d, { minutes: 25, distanceM: 2300 + i * 20 }));
+      acts.push(act(d, { id: `${d}-b`, hourStart: 13, minutes: 12, distanceM: 1200 }));
+      acts.push(act(d, { id: `${d}-c`, hourStart: 18, minutes: 20, distanceM: 2000 }));
+    }
+    ['2026-10-20', '2026-10-21', '2026-10-22'].forEach((d) => acts.push(act(d, { minutes: 20, distanceM: 1800 })));
+    acts.push(act('2026-10-25', { minutes: 240, distanceM: 21000 }));
+    // A day with only a 6-minute errand isn't an exercise day.
+    acts.push(act('2026-10-26', { minutes: 6, distanceM: 500 }));
+
     const daily = generateGoal({ date, settings, activities: acts, history: [] });
-    expect(daily.goal).toEqual({ kind: 'distance', meters: 6000, suggestedSport: 'walk' }); // median 6.0 km
-    expect(daily.meta?.notes.join(' ')).toContain('median of 11 days');
+    const meters = (daily.goal as { meters: number }).meters;
+    expect(meters).toBeGreaterThanOrEqual(5500);
+    expect(meters).toBeLessThanOrEqual(5700);
+    expect(daily.meta?.notes.join(' ')).toContain('from 12 exercise days');
+  });
+
+  it('mode falls back to the median when nothing repeats', async () => {
+    const { mostCommon } = await import('./generator');
+    expect(mostCommon([1000, 5200, 5300, 5400, 9000], 500)).toBe(5300);
+    expect(mostCommon([1000, 3000, 6000], 500)).toBe(3000);
   });
 
   it('looks back 90 days, not just the last 4 weeks', () => {

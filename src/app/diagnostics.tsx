@@ -5,7 +5,7 @@ import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { loadSettings } from '../data/db';
 import { addDays, startOfDay, toDateKey } from '../domain/dates';
 import { formatKm, formatMinutes } from '../domain/format';
-import { baselineFor, LOOKBACK_DAYS, MIN_BASELINE_ACTIVITY_S } from '../domain/generator';
+import { baselineFor, LOOKBACK_DAYS } from '../domain/generator';
 import type { Night } from '../domain/readiness';
 import type { Activity, GoalSpec, Settings } from '../domain/types';
 import { backgroundSyncStatus } from '../services/backgroundSync';
@@ -67,19 +67,17 @@ async function buildReport(db: SQLiteDatabase): Promise<Report> {
 
       // The same "typical day" numbers the goal generator uses.
       const lookbackFrom = startOfDay(addDays(toDateKey(to), -LOOKBACK_DAYS));
-      const recent = (await source.getActivities(lookbackFrom, to)).filter(
-        (a) => a.durationS >= MIN_BASELINE_ACTIVITY_S,
-      );
+      const recent = await source.getActivities(lookbackFrom, to);
       const specs: GoalSpec[] = [
         { kind: 'distance', meters: 0, suggestedSport: 'walk' },
-        { kind: 'distance', meters: 0, suggestedSport: 'ride' },
         { kind: 'duration', seconds: 0 },
         { kind: 'hr_zone', zone: 2, seconds: 0 },
       ];
       for (const spec of specs) {
         const t = baselineFor(spec, recent, settings);
         r.baselines.push({
-          label: t ? `Typical ${t.label}` : `Typical ${spec.kind === 'distance' ? `${spec.suggestedSport} distance` : spec.kind === 'duration' ? 'active time' : 'Zone 2 time'}`,
+          label:
+            spec.kind === 'distance' ? 'Distance per day' : spec.kind === 'duration' ? 'Active time per day' : 'Zone 2 per day',
           value: t
             ? `${spec.kind === 'distance' ? formatKm(t.value) : formatMinutes(t.value)} · ${t.days} days`
             : 'not enough data',
@@ -169,8 +167,8 @@ export default function DiagnosticsScreen() {
                   <Row key={b.label} k={b.label} v={b.value} />
                 ))}
                 <Text style={styles.hint}>
-                  Median over the days you did that activity, counting only activities of 15+ minutes. Goals start
-                  here and stay within 80–150% of it.
+                  Most common daily total (all your walks and rides that day added up), over days with 15+ minutes of
+                  exercise. Goals start here and stay within 80–150% of it.
                 </Text>
               </Card>
             )}

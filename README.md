@@ -13,7 +13,7 @@ Daily Spark reads the walks and rides your Galaxy Watch records (Samsung Health 
 - **Flexible rest days**: no fixed days. Every day has a goal, and you choose how many rest days you get per week (2 by default). Any day you don't hit the goal uses one of them, without breaking your streak. Train on a day you meant to rest and the rest day stays available for later that week. Only days beyond your rest days break the streak.
 - **Streak freezes**: you earn one 🧊 for every 7 days completed, up to 2. A missed day uses a freeze instead of resetting your streak.
 - **Progression**: there's no AI, just plain rules in [`src/domain/generator.ts`](src/domain/generator.ts):
-  - Your starting level is **your typical day**: the median over the last 90 days of the days you actually did that activity. For walking distance, that means your walking days, counting walks only (no rides, no activities under 15 minutes). **Settings → Diagnostics** shows these numbers.
+  - Your starting level is **your typical day**: the *mode* (most common value) of your **total exercise per day** over the last 90 days. All walks and rides of a day are added up (rides count at 1/3 for distance), and only days with 15+ minutes of exercise count. It's not an average of individual workouts. **Settings → Diagnostics** shows these numbers.
   - Each goal type goes up at most +7% a week, when you've been hitting it.
   - Missing two training days in a row (beyond your rest days) eases the next goal by 15%.
   - The day after a big effort (150%+ of the goal), the goal is 10% lighter.
