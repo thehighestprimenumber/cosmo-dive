@@ -336,3 +336,22 @@ describe('readiness', () => {
     expect(lowPoint([50, 60])).toBeNull();
   });
 });
+
+describe('usual start time', () => {
+  it('is the median first start time per day over 4 weeks', async () => {
+    const { usualStartTime, nudgeTime } = await import('./habits');
+    const acts = [17, 18, 18, 19, 20].map((h, i) => act(addDays('2026-11-19', -(i + 1)), { hourStart: h, minutes: 40 }));
+    // A short errand earlier in the day doesn't count; neither does a second walk later.
+    acts.push(act('2026-11-18', { id: 'errand', hourStart: 9, minutes: 8 }));
+    acts.push(act('2026-11-18', { id: 'second', hourStart: 21, minutes: 40 }));
+    const usual = usualStartTime(acts, '2026-11-19');
+    expect(usual).toEqual({ hour: 18, minute: 0 });
+    expect(nudgeTime(usual!)).toEqual({ hour: 17, minute: 30 });
+  });
+
+  it('needs at least 5 days of data', async () => {
+    const { usualStartTime } = await import('./habits');
+    const acts = [17, 18].map((h, i) => act(addDays('2026-11-19', -(i + 1)), { hourStart: h, minutes: 40 }));
+    expect(usualStartTime(acts, '2026-11-19')).toBeNull();
+  });
+});

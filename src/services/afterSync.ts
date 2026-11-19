@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { saveSettings } from '../data/db';
 import type { Settings } from '../domain/types';
-import { notifyGoalComplete, updateEvening } from './notifications';
+import { notifyGoalComplete, updateEvening, updateNudge } from './notifications';
 import type { Snapshot } from './sync';
 
 /**
@@ -17,6 +17,7 @@ export async function afterSync(
 ): Promise<void> {
   const done = !!snap.todayProgress?.done;
   await updateEvening(settings, snap.today, snap.todayGoal, done, snap.streak.current);
+  await updateNudge(settings, snap.today, snap.todayGoal, done, snap.usualTime);
 
   if (!done || !snap.todayGoal) return;
   // Re-read: the other side (app vs. background) may have celebrated already.

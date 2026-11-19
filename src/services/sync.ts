@@ -3,6 +3,7 @@ import { deleteGoal, insertGoal, lastGoalDate, loadGoals, loadResults, saveResul
 import { addDays, dateRange, endOfDay, startOfDay, toDateKey } from '../domain/dates';
 import { generateGoal, LOOKBACK_DAYS, PLAN_VERSION } from '../domain/generator';
 import { activitiesOn, progressOf } from '../domain/progress';
+import { usualStartTime, type TimeOfDay } from '../domain/habits';
 import { readinessFor, type Night, type ReadinessLevel } from '../domain/readiness';
 import { computeStreak, type StreakState } from '../domain/streak';
 import type { Activity, DateKey, DayResult, DayStatus, GoalSpec, Progress, Settings } from '../domain/types';
@@ -27,6 +28,8 @@ export type Snapshot = {
   /** Why today's goal is what it is. */
   todayNotes: string[];
   todayReadiness: ReadinessLevel;
+  /** When you usually start moving, learned from the last 4 weeks. */
+  usualTime: TimeOfDay | null;
   todayProgress: Progress | null;
   todayActivities: Activity[];
   streak: StreakState;
@@ -142,6 +145,7 @@ export async function refresh(
     todayGoal,
     todayNotes: goals.get(today)?.meta?.notes ?? [],
     todayReadiness: goals.get(today)?.meta?.readiness ?? 'unknown',
+    usualTime: usualStartTime(activities, today),
     todayProgress: todayGoal ? progressOf(todayGoal, todayActivities, settings) : null,
     todayActivities,
     streak,

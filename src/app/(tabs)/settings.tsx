@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
-import { Alert, Platform, ScrollView, Text } from 'react-native';
+import { Alert, Platform, ScrollView, Switch, Text, View } from 'react-native';
 import { openHealthConnectSettings } from 'react-native-health-connect';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { parseTime } from '../../domain/dates';
 import { zoneRange } from '../../domain/zones';
 import { exportHistory, importHistory } from '../../services/backupFiles';
+import { formatTime, nudgeTime } from '../../domain/habits';
 import { useApp } from '../../state/AppState';
 import type { Settings } from '../../domain/types';
 import { Button, Card, Field, Label, RestPerWeekPicker, styles } from '../../ui/components';
@@ -26,6 +27,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
   const [rideFactor, setRideFactor] = useState(String(settings.rideFactor));
   const [morning, setMorning] = useState(settings.morningReminder);
   const [evening, setEvening] = useState(settings.eveningReminder);
+  const [smart, setSmart] = useState(settings.smartReminder);
+  const usual = useApp().snapshot?.usualTime ?? null;
 
   const save = async () => {
     const hr = Number(maxHr);
@@ -39,6 +42,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
       rideFactor: factor,
       morningReminder: morning,
       eveningReminder: evening,
+      smartReminder: smart,
     });
     await refresh({ regenerateToday: true });
     Alert.alert('Saved', 'Today’s goal was updated too, unless you had already completed it.');
@@ -102,6 +106,15 @@ function SettingsForm({ settings }: { settings: Settings }) {
           />
           <Field label="Morning reminder" value={morning} onChangeText={setMorning} keyboardType="numbers-and-punctuation" />
           <Field label="Evening reminder" value={evening} onChangeText={setEvening} keyboardType="numbers-and-punctuation" />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Label>Remind me before my usual time</Label>
+            <Switch value={smart} onValueChange={setSmart} />
+          </View>
+          <Text style={styles.hint}>
+            {usual
+              ? `You usually start moving around ${formatTime(usual)}, so the reminder comes at ${formatTime(nudgeTime(usual))}.`
+              : 'Learns from your walks and rides; needs about 5 days of data.'}
+          </Text>
           <Button title="Save" onPress={save} />
         </Card>
 

@@ -78,6 +78,8 @@ export type Settings = {
   /** "HH:MM" local time. */
   morningReminder: string;
   eveningReminder: string;
+  /** Also remind 30 min before the time you usually start moving (learned). */
+  smartReminder: boolean;
   /** First day of the plan. */
   startDate: DateKey;
   dataSource: 'health_connect' | 'demo';
@@ -94,6 +96,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   maxHr: 185,
   morningReminder: '08:00',
   eveningReminder: '19:30',
+  smartReminder: true,
   dataSource: 'health_connect',
   onboarded: false,
   lastCelebrated: null,

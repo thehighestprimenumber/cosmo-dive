@@ -3,6 +3,7 @@ import { AndroidImportance } from 'expo-notifications';
 import { Platform } from 'react-native';
 import { parseTime, startOfDay } from '../domain/dates';
 import { goalTitle } from '../domain/format';
+import { formatTime, nudgeTime, type TimeOfDay } from '../domain/habits';
 import type { DateKey, GoalSpec, Settings } from '../domain/types';
 
 const CHANNEL = 'reminders';
@@ -51,6 +52,34 @@ export async function notifyGoalComplete(settings: Settings, goal: GoalSpec, str
       body: `${goalTitle(goal, settings)} ✔`,
     },
     trigger: { channelId: CHANNEL },
+  });
+}
+
+/**
+ * "You usually head out around 18:00" nudge, 30 min before your learned
+ * usual time, for today only and only while the goal isn't done.
+ */
+export async function updateNudge(
+  settings: Settings,
+  today: DateKey,
+  goal: GoalSpec | null | undefined,
+  done: boolean,
+  usual: TimeOfDay | null,
+): Promise<void> {
+  const id = `nudge-${today}`;
+  await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+  if (!settings.smartReminder || !goal || done || !usual) return;
+  const t = nudgeTime(usual);
+  const at = startOfDay(today);
+  at.setHours(t.hour, t.minute);
+  if (at.getTime() <= Date.now()) return;
+  await Notifications.scheduleNotificationAsync({
+    identifier: id,
+    content: {
+      title: `You usually get moving around ${formatTime(usual)} 🔥`,
+      body: `Today: ${goalTitle(goal, settings)}`,
+    },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at, channelId: CHANNEL },
   });
 }
 
