@@ -59,6 +59,8 @@ export type Settings = {
   startDate: DateKey;
   dataSource: 'health_connect' | 'demo';
   onboarded: boolean;
+  /** Last day whose completed goal was already celebrated (so we notify once). */
+  lastCelebrated: DateKey | null;
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -69,6 +71,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   eveningReminder: '19:30',
   dataSource: 'health_connect',
   onboarded: false,
+  lastCelebrated: null,
 };
 
 export type Progress = {

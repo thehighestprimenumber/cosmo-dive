@@ -20,7 +20,8 @@
         "android.permission.health.READ_EXERCISE",
         "android.permission.health.READ_DISTANCE",
         "android.permission.health.READ_HEART_RATE",
-        "android.permission.health.READ_HEALTH_DATA_HISTORY"
+        "android.permission.health.READ_HEALTH_DATA_HISTORY",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
       ],
       "predictiveBackGestureEnabled": false,
       "versionCode": 1
@@ -37,7 +38,8 @@
             "minSdkVersion": 26
           }
         }
-      ]
+      ],
+      "expo-background-task"
     ]
   }
 }

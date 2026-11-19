@@ -43,6 +43,17 @@ export async function scheduleMorning(settings: Settings): Promise<void> {
   });
 }
 
+/** Shown when the background sync sees today's goal completed. */
+export async function notifyGoalComplete(settings: Settings, goal: GoalSpec, streak: number): Promise<void> {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: `Goal complete! 🔥 ${streak}-day streak`,
+      body: `${goalTitle(goal, settings)} ✔`,
+    },
+    trigger: { channelId: CHANNEL },
+  });
+}
+
 /**
  * One-off "save your streak" reminder for today. Scheduled whenever the app
  * syncs and today's goal isn't done yet; cancelled once it is.

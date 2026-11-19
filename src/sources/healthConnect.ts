@@ -25,6 +25,8 @@ const PERMISSIONS = [
   ...READ_TYPES.map((recordType) => ({ accessType: 'read' as const, recordType })),
   // Without this, Health Connect only returns the last 30 days.
   { accessType: 'read' as const, recordType: 'ReadHealthDataHistory' as const },
+  // Lets the background sync read activities while the app is closed.
+  { accessType: 'read' as const, recordType: 'BackgroundAccessPermission' as const },
 ];
 
 let initialized = false;

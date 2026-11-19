@@ -4,14 +4,12 @@ import { AppState as RNAppState } from 'react-native';
 import { loadSettings, saveSettings } from '../data/db';
 import { toDateKey } from '../domain/dates';
 import type { Settings } from '../domain/types';
-import { scheduleMorning, setupNotifications, updateEvening } from '../services/notifications';
+import { scheduleMorning, setupNotifications } from '../services/notifications';
 import { refresh as runRefresh, type Snapshot } from '../services/sync';
-import type { ActivitySource, SourceStatus } from '../sources/ActivitySource';
-import { demoSource } from '../sources/demo';
-import { healthConnectSource } from '../sources/healthConnect';
-
-export const sourceFor = (s: Pick<Settings, 'dataSource'>): ActivitySource =>
-  s.dataSource === 'demo' ? demoSource : healthConnectSource;
+import { afterSync } from '../services/afterSync';
+import { registerBackgroundSync } from '../services/backgroundSync';
+import type { SourceStatus } from '../sources/ActivitySource';
+import { sourceFor } from '../sources';
 
 type Ctx = {
   settings: Settings | null;
@@ -52,9 +50,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           if (status.state !== 'ready') return;
           const snap = await runRefresh(db, source, s, opts);
           setSnapshot(snap);
-          await updateEvening(s, snap.today, snap.todayGoal, !!snap.todayProgress?.done, snap.streak.current).catch(
-            () => {},
-          );
+          await afterSync(db, s, snap, { inBackground: false }).catch(() => {});
+          await registerBackgroundSync().catch(() => {});
         } catch (e) {
           setError(e instanceof Error ? e.message : String(e));
         } finally {
