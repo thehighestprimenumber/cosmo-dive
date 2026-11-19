@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { AppState as RNAppState } from 'react-native';
 import { loadSettings, saveSettings } from '../data/db';
 import { toDateKey } from '../domain/dates';
-import type { Settings } from '../domain/types';
+import type { GoalKind, Settings } from '../domain/types';
 import { scheduleMorning, setupNotifications } from '../services/notifications';
 import { refresh as runRefresh, type Snapshot } from '../services/sync';
 import { afterSync } from '../services/afterSync';
@@ -17,7 +17,7 @@ type Ctx = {
   sourceStatus: SourceStatus | null;
   syncing: boolean;
   error: string | null;
-  refresh: (opts?: { fullRebuild?: boolean; regenerateToday?: boolean }) => Promise<void>;
+  refresh: (opts?: { fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: GoalKind }) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
   /** Re-reads settings from the database (e.g. after an import) and rebuilds history. */
   reloadAll: () => Promise<void>;
@@ -38,7 +38,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const inFlight = useRef<Promise<void> | null>(null);
 
   const doRefresh = useCallback(
-    async (opts: { fullRebuild?: boolean; regenerateToday?: boolean } = {}) => {
+    async (opts: { fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: GoalKind } = {}) => {
       const s = settingsRef.current;
       if (!s?.onboarded) return;
       if (inFlight.current) return inFlight.current;

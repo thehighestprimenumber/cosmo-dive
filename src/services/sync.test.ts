@@ -157,5 +157,22 @@ describe('refresh', () => {
     expect(t(later.todayGoal!)).toBeLessThan(t(before));
     expect(later.todayNotes.join(' ')).toContain('Short night');
   });
+
+  it('switching today to a time goal lets a kayak session complete it', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const start = startOfDay('2026-11-19').getTime() + 10 * 3_600_000;
+    const kayak = {
+      id: 'kayak', sport: 'other' as const, label: 'paddling', start, end: start + 90 * 60_000,
+      durationS: 90 * 60, distanceM: 8000, hr: [], origin: 'test',
+    };
+    const s = { ...settings, startDate: '2026-11-19' };
+    const now = new Date(2026, 10, 19, 18, 0);
+    await refresh(db, sourceOf([kayak]), s, { now });
+    const snap = await refresh(db, sourceOf([kayak]), s, { now, regenerateToday: true, todayKind: 'duration' });
+    expect(snap.todayGoal?.kind).toBe('duration');
+    expect(snap.todayProgress?.done).toBe(true);
+    expect(snap.days.get('2026-11-19')?.status).toBe('done');
+  });
 });
 

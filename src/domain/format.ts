@@ -34,12 +34,12 @@ export function goalTitle(goal: GoalSpec, settings: Pick<Settings, 'rideFactor'>
 export function goalSubtitle(goal: GoalSpec, settings: Pick<Settings, 'maxHr'>): string {
   switch (goal.kind) {
     case 'distance':
-      return 'Any walks and rides today add up.';
+      return 'Walks, runs and rides today add up (other sports count for time goals).';
     case 'duration':
-      return 'Any walks and rides today add up.';
+      return 'Any exercise your watch records counts: walks, rides, kayak, swimming, gym…';
     case 'hr_zone': {
       const [lo, hi] = zoneRange(goal.zone, settings.maxHr);
-      return `Keep your heart rate at ${lo}–${hi} bpm during a walk or ride.`;
+      return `Keep your heart rate at ${lo}–${hi} bpm during any exercise.`;
     }
   }
 }

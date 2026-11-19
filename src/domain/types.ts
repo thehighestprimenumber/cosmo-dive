@@ -1,7 +1,15 @@
 /** A local calendar date, formatted "YYYY-MM-DD". */
 export type DateKey = string;
 
-export type Sport = 'walk' | 'ride';
+/**
+ * walk: walking, hiking, running (distance counts 1:1)
+ * ride: cycling (distance counts 1/rideFactor)
+ * other: everything else (kayak, swimming, gym…): counts for time and heart
+ * rate goals, not for distance.
+ */
+export type Sport = 'walk' | 'ride' | 'other';
+/** Sports with a distance that compares to walking. */
+export type DistanceSport = 'walk' | 'ride';
 
 export type HrSample = {
   /** Epoch milliseconds. */
@@ -23,6 +31,8 @@ export type Activity = {
   hr: HrSample[];
   /** Which app wrote it (e.g. "com.sec.android.app.shealth"). */
   origin: string;
+  /** Exercise type as recorded, e.g. "paddling". */
+  label?: string;
 };
 
 export type HrZone = 1 | 2 | 3 | 4 | 5;
@@ -33,7 +43,7 @@ export type HrZone = 1 | 2 | 3 | 4 | 5;
  */
 export type GoalSpec =
   /** Distance in walk-equivalent metres (ride metres are divided by the ride factor). */
-  | { kind: 'distance'; meters: number; suggestedSport: Sport }
+  | { kind: 'distance'; meters: number; suggestedSport: DistanceSport }
   | { kind: 'duration'; seconds: number }
   | { kind: 'hr_zone'; zone: HrZone; seconds: number };
 

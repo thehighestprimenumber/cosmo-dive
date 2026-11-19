@@ -15,7 +15,7 @@ import { activitiesOn, progressOf } from '../domain/progress';
 import { usualStartTime, type TimeOfDay } from '../domain/habits';
 import { readinessFor, type Night, type ReadinessLevel } from '../domain/readiness';
 import { computeStreak, type StreakState } from '../domain/streak';
-import type { Activity, DateKey, DayResult, DayStatus, GoalMeta, GoalSpec, Progress, Settings } from '../domain/types';
+import type { Activity, DateKey, DayResult, DayStatus, GoalKind, GoalMeta, GoalSpec, Progress, Settings } from '../domain/types';
 import type { ActivitySource } from '../sources/ActivitySource';
 
 /** Days that are always re-checked against Health Connect (late syncs, edits, deletions). */
@@ -76,7 +76,7 @@ export async function refresh(
   db: SQLiteDatabase,
   source: ActivitySource,
   settings: Settings,
-  opts: { now?: Date; fullRebuild?: boolean; regenerateToday?: boolean } = {},
+  opts: { now?: Date; fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: GoalKind } = {},
 ): Promise<Snapshot> {
   const today = toDateKey(opts.now ?? new Date());
   const start = settings.startDate;
@@ -130,7 +130,8 @@ export async function refresh(
     if (!daily && date >= generateFrom) {
       const statuses = computeStreak(history, date, settings.restDaysPerWeek).statuses;
       const readiness = source.getNights ? readinessFor(date, nights) : undefined;
-      daily = generateGoal({ date, settings, activities, history, statuses, readiness });
+      const kind = date === today ? opts.todayKind : undefined;
+      daily = generateGoal({ date, settings, activities, history, statuses, readiness, kind });
       await insertGoal(db, daily);
       goals.set(date, daily);
     }

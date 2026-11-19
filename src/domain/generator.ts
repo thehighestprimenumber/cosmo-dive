@@ -12,8 +12,8 @@ import type {
   GoalKind,
   GoalSpec,
   HrZone,
+  DistanceSport,
   Settings,
-  Sport,
 } from './types';
 
 /**
@@ -65,9 +65,19 @@ export type GeneratorInput = {
   statuses?: Map<DateKey, DayStatus>;
   /** Last night's sleep and resting heart rate, if available. */
   readiness?: Readiness;
+  /** You picked the goal type yourself (e.g. a time goal on a kayak day). */
+  kind?: GoalKind;
 };
 
-export function generateGoal({ date, settings, activities, history, statuses, readiness }: GeneratorInput): DailyGoal {
+export function generateGoal({
+  date,
+  settings,
+  activities,
+  history,
+  statuses,
+  readiness,
+  kind: chosenKind,
+}: GeneratorInput): DailyGoal {
   const windowStart = addDays(date, -LOOKBACK_DAYS);
   const recent = activities.filter((a) => {
     const d = toDateKey(a.start);
@@ -76,7 +86,7 @@ export function generateGoal({ date, settings, activities, history, statuses, re
   const past = history.filter((h) => h.date < date).sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const hasHr = recent.some((a) => a.hr.length >= 2);
-  const kind = kindForDay(date, hasHr);
+  const kind = chosenKind ?? kindForDay(date, hasHr);
   const week = weekIndex(date, settings.startDate);
   const recovery = isRecoveryWeek(date, settings.startDate);
 
@@ -90,6 +100,7 @@ export function generateGoal({ date, settings, activities, history, statuses, re
     spec = { kind, seconds: 0 };
   }
   const notes: string[] = [];
+  if (chosenKind) notes.push('You picked this goal type for today.');
   const fmt = (v: number) => (kind === 'distance' ? formatKm(v) : formatMinutes(v));
 
   // 1. Your typical day for this goal type, from your own history.
@@ -256,9 +267,10 @@ function withTarget(g: GoalSpec, target: number): GoalSpec {
   return g.kind === 'distance' ? { ...g, meters: target } : { ...g, seconds: target };
 }
 
-function favouriteSport(recent: Activity[]): Sport {
+function favouriteSport(recent: Activity[]): DistanceSport {
   const rides = recent.filter((a) => a.sport === 'ride').length;
-  return rides > recent.length - rides ? 'ride' : 'walk';
+  const walks = recent.filter((a) => a.sport === 'walk').length;
+  return rides > walks ? 'ride' : 'walk';
 }
 
 function median(xs: number[]): number {

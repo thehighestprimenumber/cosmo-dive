@@ -14,12 +14,16 @@ import { lowPoint, type Night } from '../domain/readiness';
 import type { Activity, HrSample, Sport } from '../domain/types';
 import type { ActivitySource, SourceStatus } from './ActivitySource';
 
+/** Everything not listed here is 'other': counts for time and heart rate goals, not distance. */
 const SPORT_BY_TYPE: Record<number, Sport> = {
   [ExerciseType.WALKING]: 'walk',
   [ExerciseType.HIKING]: 'walk',
+  [ExerciseType.RUNNING]: 'walk',
+  [ExerciseType.RUNNING_TREADMILL]: 'walk',
   [ExerciseType.BIKING]: 'ride',
   [ExerciseType.BIKING_STATIONARY]: 'ride',
 };
+const sportOf = (type: number): Sport => SPORT_BY_TYPE[type] ?? 'other';
 
 const READ_TYPES = ['ExerciseSession', 'Distance', 'HeartRate'] as const;
 
@@ -129,9 +133,7 @@ export const healthConnectSource: ActivitySource = {
 
   async getActivities(from: Date, to: Date): Promise<Activity[]> {
     await ensureInitialized();
-    const sessions = (await readAll('ExerciseSession', from, to)).filter(
-      (s) => SPORT_BY_TYPE[s.exerciseType] !== undefined,
-    );
+    const sessions = await readAll('ExerciseSession', from, to);
 
     const activities = await Promise.all(
       sessions.map(async (s): Promise<Activity> => {
@@ -162,7 +164,8 @@ export const healthConnectSource: ActivitySource = {
 
         return {
           id: s.metadata?.id ?? `${origin}-${s.startTime}`,
-          sport: SPORT_BY_TYPE[s.exerciseType],
+          sport: sportOf(s.exerciseType),
+          label: TYPE_NAMES[s.exerciseType] ?? 'workout',
           start: start.getTime(),
           end: end.getTime(),
           durationS: (end.getTime() - start.getTime()) / 1000,
@@ -200,7 +203,7 @@ export async function listRawSessions(from: Date, to: Date): Promise<RawSession[
     .map((s) => ({
       id: s.metadata?.id ?? s.startTime,
       type: TYPE_NAMES[s.exerciseType] ?? `type ${s.exerciseType}`,
-      counted: SPORT_BY_TYPE[s.exerciseType] !== undefined,
+      counted: true,
       start: new Date(s.startTime).getTime(),
       end: new Date(s.endTime).getTime(),
       origin: s.metadata?.dataOrigin ?? 'unknown',

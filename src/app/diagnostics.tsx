@@ -217,13 +217,13 @@ export default function DiagnosticsScreen() {
                 return (
                   <View key={s.id} style={{ paddingVertical: 6, borderBottomWidth: 1, borderColor: colors.cardBorder }}>
                     <Text style={styles.body}>
-                      {a ? '✅' : s.counted ? '♻️' : '➖'} {s.type} · {fmtTime(s.start)}
+                      {a ? '✅' : '♻️'} {s.type} · {fmtTime(s.start)}
                     </Text>
                     <Text style={styles.muted}>
                       {formatMinutes((s.end - s.start) / 1000)}
                       {a?.distanceM != null ? ` · ${formatKm(a.distanceM)}` : ''}
                       {a ? ` · ${a.hr.length} heart rate samples` : ''}
-                      {!s.counted ? ' · not a walk or ride' : !a ? ' · duplicate, ignored' : ''}
+                      {!a ? ' · duplicate, ignored' : ''}
                     </Text>
                     <Text style={styles.hint}>{s.origin}</Text>
                   </View>
@@ -253,7 +253,7 @@ function Row({ k, v, ok }: { k: string; v: string; ok?: boolean }) {
 function ActivityLine({ a }: { a: Activity }) {
   return (
     <Text style={[styles.muted, { paddingVertical: 4 }]}>
-      {a.sport === 'walk' ? '🚶' : '🚴'} {fmtTime(a.start)} · {formatMinutes(a.durationS)}
+      {a.sport === 'walk' ? '🚶' : a.sport === 'ride' ? '🚴' : '🏅'} {fmtTime(a.start)} · {formatMinutes(a.durationS)}
       {a.distanceM != null ? ` · ${formatKm(a.distanceM)}` : ''} · {a.hr.length} HR samples
     </Text>
   );

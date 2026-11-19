@@ -366,3 +366,32 @@ describe('usual start time', () => {
     expect(usualStartTime(acts, '2026-11-19')).toBeNull();
   });
 });
+
+describe('other sports (e.g. kayak)', () => {
+  const kayak = act('2026-11-19', {
+    id: 'kayak',
+    sport: 'other',
+    label: 'paddling',
+    minutes: 90,
+    distanceM: 8000,
+    hr: Array.from({ length: 91 }, (_, i) => ({ t: startOfDay('2026-11-19').getTime() + 9 * 3_600_000 + i * 60_000, bpm: 120 })),
+  });
+
+  it('count for time and heart rate goals, not distance', () => {
+    expect(measure({ kind: 'duration', seconds: 3600 }, [kayak], settings)).toBe(90 * 60);
+    expect(measure({ kind: 'hr_zone', zone: 2, seconds: 600 }, [kayak], settings)).toBeGreaterThan(80 * 60); // 120 bpm = Z2 at max 185
+    expect(measure({ kind: 'distance', meters: 5000, suggestedSport: 'walk' }, [kayak], settings)).toBe(0);
+  });
+
+  it('runs count as walking distance', () => {
+    const run = act('2026-11-19', { id: 'run', sport: 'walk', label: 'running', minutes: 30, distanceM: 5000 });
+    expect(measure({ kind: 'distance', meters: 5000, suggestedSport: 'walk' }, [run], settings)).toBe(5000);
+  });
+
+  it('you can pick today\'s goal type', () => {
+    const date = dayOfKind('distance');
+    const g = generateGoal({ date, settings, activities: [], history: [], kind: 'duration' });
+    expect(g.goal?.kind).toBe('duration');
+    expect(g.meta?.notes[0]).toContain('You picked');
+  });
+});

@@ -4,7 +4,7 @@ import { secondsInZone } from './zones';
 
 /** Distance in walk-equivalent metres: rides count 1/rideFactor. */
 export function walkEquivalentMeters(a: Activity, rideFactor: number): number {
-  if (a.distanceM == null) return 0;
+  if (a.distanceM == null || a.sport === 'other') return 0;
   return a.sport === 'walk' ? a.distanceM : a.distanceM / rideFactor;
 }
 

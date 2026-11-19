@@ -4,7 +4,7 @@ import { Animated, Pressable, RefreshControl, ScrollView, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatKm, formatMinutes, formatValue, goalEmoji, goalSubtitle, goalTitle } from '../../domain/format';
 import { weekSummary } from '../../domain/summary';
-import type { Activity } from '../../domain/types';
+import type { Activity, GoalKind } from '../../domain/types';
 import { ACHIEVEMENTS } from '../../domain/game';
 import { sourceFor } from '../../sources';
 import { useApp } from '../../state/AppState';
@@ -146,6 +146,27 @@ export default function TodayScreen() {
                   : 'No rest days left this week: skipping today costs a freeze or your streak.'}
               </Text>
             )}
+            {!done && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.label}>Doing something different today?</Text>
+                <View style={styles.chips}>
+                  {KIND_CHOICES.map((c) => {
+                    const on = goal.kind === c.kind;
+                    return (
+                      <Pressable
+                        key={c.kind}
+                        disabled={on || syncing}
+                        onPress={() => refresh({ regenerateToday: true, todayKind: c.kind })}
+                        style={[styles.chip, on && styles.chipOn]}
+                      >
+                        <Text style={[styles.chipText, on && { color: colors.text }]}>{c.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={styles.hint}>Time and heart rate goals count every sport, e.g. kayak or swimming.</Text>
+              </View>
+            )}
             {snapshot.todayNotes.length > 0 && (
               <View style={{ marginTop: 12, gap: 2 }}>
                 <Text style={styles.label}>Why this goal</Text>
@@ -231,6 +252,12 @@ export default function TodayScreen() {
   );
 }
 
+const KIND_CHOICES: { kind: GoalKind; label: string }[] = [
+  { kind: 'distance', label: '📏 Distance' },
+  { kind: 'duration', label: '⏱️ Time' },
+  { kind: 'hr_zone', label: '❤️ Heart rate' },
+];
+
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 function WeekCard({ summary, today }: { summary: ReturnType<typeof weekSummary>; today: string }) {
@@ -269,7 +296,8 @@ function ActivityRow({ a }: { a: Activity }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
       <Text style={styles.body}>
-        {a.sport === 'walk' ? '🚶' : '🚴'} {time}
+        {a.sport === 'walk' ? '🚶' : a.sport === 'ride' ? '🚴' : '🏅'} {time}
+        {a.label && a.sport === 'other' ? ` · ${a.label}` : ''}
       </Text>
       <Text style={styles.muted}>{parts.join(' · ')}</Text>
     </View>
