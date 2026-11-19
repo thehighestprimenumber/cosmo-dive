@@ -127,3 +127,41 @@ export const healthConnectSource: ActivitySource = {
     return dedupeActivities(activities);
   },
 };
+
+// ---- diagnostics ----
+
+const TYPE_NAMES: Record<number, string> = Object.fromEntries(
+  Object.entries(ExerciseType).map(([name, id]) => [id, name.toLowerCase().replace(/_/g, ' ')]),
+);
+
+export type RawSession = {
+  id: string;
+  type: string;
+  counted: boolean;
+  start: number;
+  end: number;
+  origin: string;
+};
+
+/** Every exercise session Health Connect has, including ones Daily Spark ignores. */
+export async function listRawSessions(from: Date, to: Date): Promise<RawSession[]> {
+  await ensureInitialized();
+  const sessions = await readAll('ExerciseSession', from, to);
+  return sessions
+    .map((s) => ({
+      id: s.metadata?.id ?? s.startTime,
+      type: TYPE_NAMES[s.exerciseType] ?? `type ${s.exerciseType}`,
+      counted: SPORT_BY_TYPE[s.exerciseType] !== undefined,
+      start: new Date(s.startTime).getTime(),
+      end: new Date(s.endTime).getTime(),
+      origin: s.metadata?.dataOrigin ?? 'unknown',
+    }))
+    .sort((a, b) => b.start - a.start);
+}
+
+/** Granted Health Connect permissions, as readable names. */
+export async function listGrantedPermissions(): Promise<string[]> {
+  await ensureInitialized();
+  const granted = await getGrantedPermissions();
+  return granted.map((p) => `${p.accessType} ${p.recordType}`).sort();
+}

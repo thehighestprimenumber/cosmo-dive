@@ -19,6 +19,8 @@ type Ctx = {
   error: string | null;
   refresh: (opts?: { fullRebuild?: boolean }) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
+  /** Re-reads settings from the database (e.g. after an import) and rebuilds history. */
+  reloadAll: () => Promise<void>;
   /** Asks for data source permission; returns true when ready. */
   connect: (dataSource?: Settings['dataSource']) => Promise<boolean>;
 };
@@ -101,6 +103,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [updateSettings],
   );
 
+  const reloadAll = useCallback(async () => {
+    const s = await loadSettings(db, toDateKey(new Date()));
+    settingsRef.current = s;
+    setSettings(s);
+    await doRefresh({ fullRebuild: true });
+  }, [db, doRefresh]);
+
   // Initial load.
   useEffect(() => {
     (async () => {
@@ -124,7 +133,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppStateContext.Provider
-      value={{ settings, snapshot, sourceStatus, syncing, error, refresh: doRefresh, updateSettings, connect }}
+      value={{ settings, snapshot, sourceStatus, syncing, error, refresh: doRefresh, updateSettings, reloadAll, connect }}
     >
       {children}
     </AppStateContext.Provider>

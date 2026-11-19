@@ -1,7 +1,7 @@
 import * as BackgroundTask from 'expo-background-task';
 import * as SQLite from 'expo-sqlite';
 import * as TaskManager from 'expo-task-manager';
-import { DB_NAME, loadSettings, migrate } from '../data/db';
+import { DB_NAME, loadSettings, migrate, saveSettings } from '../data/db';
 import { toDateKey } from '../domain/dates';
 import { sourceFor } from '../sources';
 import { afterSync } from './afterSync';
@@ -30,6 +30,7 @@ TaskManager.defineTask(SYNC_TASK, async () => {
 
     const snap = await refresh(db, source, settings);
     await afterSync(db, settings, snap, { inBackground: true });
+    await saveSettings(db, { lastBackgroundSync: Date.now() });
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch {
     return BackgroundTask.BackgroundTaskResult.Failed;
@@ -43,4 +44,12 @@ export async function registerBackgroundSync(): Promise<void> {
   if (status !== BackgroundTask.BackgroundTaskStatus.Available) return;
   if (await TaskManager.isTaskRegisteredAsync(SYNC_TASK)) return;
   await BackgroundTask.registerTaskAsync(SYNC_TASK, { minimumInterval: 30 });
+}
+
+export async function backgroundSyncStatus(): Promise<{ available: boolean; registered: boolean }> {
+  const status = await BackgroundTask.getStatusAsync();
+  return {
+    available: status === BackgroundTask.BackgroundTaskStatus.Available,
+    registered: await TaskManager.isTaskRegisteredAsync(SYNC_TASK),
+  };
 }

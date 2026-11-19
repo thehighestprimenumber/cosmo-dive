@@ -61,6 +61,8 @@ export type Settings = {
   onboarded: boolean;
   /** Last day whose completed goal was already celebrated (so we notify once). */
   lastCelebrated: DateKey | null;
+  /** Epoch ms of the last successful background sync (shown in Diagnostics). */
+  lastBackgroundSync: number | null;
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -72,6 +74,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   dataSource: 'health_connect',
   onboarded: false,
   lastCelebrated: null,
+  lastBackgroundSync: null,
 };
 
 export type Progress = {

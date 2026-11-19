@@ -1,9 +1,12 @@
+import { router } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Alert, Platform, ScrollView, Text } from 'react-native';
 import { openHealthConnectSettings } from 'react-native-health-connect';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { parseTime } from '../../domain/dates';
 import { zoneRange } from '../../domain/zones';
+import { exportHistory, importHistory } from '../../services/backupFiles';
 import { useApp } from '../../state/AppState';
 import type { Settings } from '../../domain/types';
 import { Button, Card, Field, Label, RestDayPicker, styles } from '../../ui/components';
@@ -16,7 +19,8 @@ export default function SettingsScreen() {
 }
 
 function SettingsForm({ settings }: { settings: Settings }) {
-  const { updateSettings, refresh, connect, syncing } = useApp();
+  const db = useSQLiteContext();
+  const { updateSettings, refresh, connect, syncing, reloadAll } = useApp();
   const [restDays, setRestDays] = useState<number[]>(settings.restDays);
   const [maxHr, setMaxHr] = useState(String(settings.maxHr));
   const [rideFactor, setRideFactor] = useState(String(settings.rideFactor));
@@ -32,6 +36,25 @@ function SettingsForm({ settings }: { settings: Settings }) {
     await updateSettings({ restDays, maxHr: hr, rideFactor: factor, morningReminder: morning, eveningReminder: evening });
     await refresh();
     Alert.alert('Saved', 'Changes apply to goals from tomorrow. Today’s goal stays as it is.');
+  };
+
+  const doExport = async () => {
+    try {
+      await exportHistory(db);
+    } catch (e) {
+      Alert.alert('Export failed', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const doImport = async () => {
+    try {
+      const added = await importHistory(db);
+      if (added === null) return;
+      await reloadAll();
+      Alert.alert('Imported', `${added} past goals added. Your streak has been recalculated.`);
+    } catch (e) {
+      Alert.alert('Import failed', e instanceof Error ? e.message : String(e));
+    }
   };
 
   const rebuild = async () => {
@@ -94,6 +117,17 @@ function SettingsForm({ settings }: { settings: Settings }) {
           <Text style={[styles.hint, { marginTop: 8 }]}>
             Re-checks every past goal against your activities, e.g. after editing or deleting a workout.
           </Text>
+          <Button title="Diagnostics" variant="secondary" onPress={() => router.push('/diagnostics')} />
+        </Card>
+
+        <Card>
+          <Label>Backup</Label>
+          <Text style={styles.muted}>
+            Your goal history only lives on this phone. Export it now and then (e.g. to Google Drive) so you can
+            import it on a new phone.
+          </Text>
+          <Button title="Export history" variant="secondary" onPress={doExport} />
+          <Button title="Import history" variant="secondary" onPress={doImport} disabled={syncing} />
         </Card>
       </ScrollView>
     </SafeAreaView>
