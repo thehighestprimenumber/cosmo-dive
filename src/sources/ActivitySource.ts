@@ -1,3 +1,4 @@
+import type { Night } from '../domain/readiness';
 import type { Activity } from '../domain/types';
 
 export type SourceStatus =
@@ -16,4 +17,9 @@ export interface ActivitySource {
   requestAccess(): Promise<boolean>;
   /** Walks and rides that started in [from, to), with heart rate samples attached. */
   getActivities(from: Date, to: Date): Promise<Activity[]>;
+  /** Nights of sleep whose wake-up date falls in [from, to). Optional; used for readiness. */
+  getNights?(from: Date, to: Date): Promise<Night[]>;
+  /** Whether sleep can be read (separate, optional permission). */
+  hasSleepAccess?(): Promise<boolean>;
+  requestSleepAccess?(): Promise<boolean>;
 }

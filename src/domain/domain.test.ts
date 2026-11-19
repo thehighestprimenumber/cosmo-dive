@@ -291,3 +291,48 @@ describe('weekSummary', () => {
     expect(s.days[0].status).toBe('none');
   });
 });
+
+describe('readiness', () => {
+  const nights = (n: number, sleepH: number, hr: number, before = '2026-11-19') =>
+    Array.from({ length: n }, (_, i) => ({ date: addDays(before, -(i + 1)), sleepS: sleepH * 3600, lowHr: hr }));
+
+  it('is unknown without last night', async () => {
+    const { readinessFor } = await import('./readiness');
+    expect(readinessFor('2026-11-19', nights(10, 7, 55)).level).toBe('unknown');
+  });
+
+  it('goes easier after a short night or a raised resting heart rate', async () => {
+    const { readinessFor } = await import('./readiness');
+    const short = readinessFor('2026-11-19', [...nights(10, 7, 55), { date: '2026-11-19', sleepS: 5 * 3600, lowHr: 55 }]);
+    expect(short).toMatchObject({ level: 'low', factor: 0.85 });
+    expect(short.notes[0]).toContain('usually sleep 7 h');
+    const hr = readinessFor('2026-11-19', [...nights(10, 7, 55), { date: '2026-11-19', sleepS: 7 * 3600, lowHr: 61 }]);
+    expect(hr.level).toBe('low');
+    expect(hr.notes[0]).toContain('61 bpm (usually 55)');
+  });
+
+  it('adds a little when well rested, and is normal otherwise', async () => {
+    const { readinessFor } = await import('./readiness');
+    expect(readinessFor('2026-11-19', [...nights(10, 7, 55), { date: '2026-11-19', sleepS: 7.5 * 3600, lowHr: 52 }]).level).toBe('high');
+    expect(readinessFor('2026-11-19', [...nights(10, 7, 55), { date: '2026-11-19', sleepS: 7 * 3600, lowHr: 55 }]).level).toBe('normal');
+  });
+
+  it('only changes today, not the plan', async () => {
+    const { readinessFor } = await import('./readiness');
+    const date = '2026-11-19';
+    const acts = Array.from({ length: 6 }, (_, i) => act(addDays(date, -(i + 3)), { minutes: 60, distanceM: 6000 }));
+    const tired = readinessFor(date, [...nights(10, 7, 55, date), { date, sleepS: 4 * 3600, lowHr: 55 }]);
+    const normal = generateGoal({ date, settings, activities: acts, history: [] });
+    const easy = generateGoal({ date, settings, activities: acts, history: [], readiness: tired });
+    const t = (g: typeof normal) => (g.goal!.kind === 'distance' ? g.goal!.meters : (g.goal as { seconds: number }).seconds);
+    expect(t(easy)).toBeLessThan(t(normal));
+    expect(easy.meta?.base).toBe(normal.meta?.base);
+    expect(easy.meta?.readiness).toBe('low');
+  });
+
+  it('takes a robust low point of heart rate', async () => {
+    const { lowPoint } = await import('./readiness');
+    expect(lowPoint([40, ...Array.from({ length: 30 }, (_, i) => 55 + i)])).toBe(57); // the lone 40 is ignored
+    expect(lowPoint([50, 60])).toBeNull();
+  });
+});

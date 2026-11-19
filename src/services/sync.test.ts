@@ -133,4 +133,29 @@ describe('refresh', () => {
     const goals = await loadGoals(db, '2026-11-09', '2026-11-13');
     expect(goals.every((g) => g.goal !== null && g.meta && g.meta.notes.length > 0)).toBe(true);
   });
+
+  it('redoes today\'s goal once last night\'s sleep arrives, using readiness', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const date = '2026-11-19';
+    const acts = Array.from({ length: 10 }, (_, i) => walk(addDays(date, -(i + 2)), 60));
+    const usual = Array.from({ length: 10 }, (_, i) => ({ date: addDays(date, -(i + 1)), sleepS: 7 * 3600, lowHr: 55 }));
+    let nights = usual;
+    const source = { ...sourceOf(acts), getNights: async () => nights };
+    const s = { ...settings, startDate: date };
+
+    // 1 am: last night isn't over yet.
+    const early = await refresh(db, source, s, { now: new Date(2026, 10, 19, 1, 0) });
+    expect(early.todayReadiness).toBe('unknown');
+    const before = early.todayGoal!;
+
+    // 9 am: a 4-hour night has synced → today's goal is redone, lighter, and says why.
+    nights = [...usual, { date, sleepS: 4 * 3600, lowHr: 55 }];
+    const later = await refresh(db, source, s, { now: new Date(2026, 10, 19, 9, 0) });
+    expect(later.todayReadiness).toBe('low');
+    const t = (g: typeof before) => (g!.kind === 'distance' ? g!.meters : (g as { seconds: number }).seconds);
+    expect(t(later.todayGoal!)).toBeLessThan(t(before));
+    expect(later.todayNotes.join(' ')).toContain('Short night');
+  });
 });
+

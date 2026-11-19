@@ -48,6 +48,11 @@ export type GoalMeta = {
   base: number;
   /** Human-readable reasons, shown under the goal. */
   notes: string[];
+  /**
+   * Readiness when the goal was made. 'unknown' (e.g. made at 1 am, before
+   * you woke up) lets today's goal be redone once last night's sleep is in.
+   */
+  readiness?: 'low' | 'normal' | 'high' | 'unknown';
 };
 
 /**

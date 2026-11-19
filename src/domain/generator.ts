@@ -1,6 +1,7 @@
 import { addDays, daysBetween, mondayOf, toDateKey } from './dates';
 import { formatKm, formatMinutes } from './format';
 import { measure } from './progress';
+import type { Readiness } from './readiness';
 import type {
   Activity,
   DailyGoal,
@@ -59,9 +60,11 @@ export type GeneratorInput = {
   history: DayResult[];
   /** Streak statuses of earlier days, so rest days aren't mistaken for misses. */
   statuses?: Map<DateKey, DayStatus>;
+  /** Last night's sleep and resting heart rate, if available. */
+  readiness?: Readiness;
 };
 
-export function generateGoal({ date, settings, activities, history, statuses }: GeneratorInput): DailyGoal {
+export function generateGoal({ date, settings, activities, history, statuses, readiness }: GeneratorInput): DailyGoal {
   const windowStart = addDays(date, -LOOKBACK_DAYS);
   const recent = activities.filter((a) => {
     const d = toDateKey(a.start);
@@ -143,13 +146,17 @@ export function generateGoal({ date, settings, activities, history, statuses }: 
     target *= AFTER_BIG_DAY;
     notes.push('A bit lighter after yesterday’s big effort.');
   }
+  if (readiness && readiness.level !== 'unknown') {
+    target *= readiness.factor;
+    notes.push(...readiness.notes);
+  }
   target = clamp(roundTo(target, STEP[kind]), LIMITS[kind][0], LIMITS[kind][1]);
 
   return {
     date,
     goal: withTarget(spec, target),
     planVersion: PLAN_VERSION,
-    meta: { base: roundTo(base, STEP[kind]), notes },
+    meta: { base: roundTo(base, STEP[kind]), notes, readiness: readiness?.level ?? 'unknown' },
   };
 }
 

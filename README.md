@@ -19,6 +19,7 @@ Daily Spark reads the walks and rides your Galaxy Watch records (Samsung Health 
   - The day after a big effort (150%+ of the goal), the goal is 10% lighter.
   - Every 4th week is a recovery week at 80%.
   - Goals stay between 80% and 150% of your typical day.
+  - **Readiness** (optional sleep permission): after a short night (under 5.5 h, or 20% below your usual) or a resting heart rate 5+ bpm above your 2-week usual, today's goal is 15% lighter. Well rested with a low resting heart rate: 5% harder. A goal made before you woke up is redone once last night's sleep syncs (unless you've already done it). These tweaks apply to today only and never lower the plan.
   - Each goal lists *why* it is what it is under **Why this goal**.
 - **Background sync**: about every 30 minutes (Android decides exactly when), the app reads Health Connect, notifies you once when today's goal is done, and keeps the evening reminder up to date.
 - **Backup**: **Settings → Export history** saves your goal history to a JSON file (e.g. to Google Drive). **Import history** merges it on a new phone and recalculates your streak.

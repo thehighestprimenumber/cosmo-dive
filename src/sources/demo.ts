@@ -1,4 +1,5 @@
 import { addDays, startOfDay, toDateKey } from '../domain/dates';
+import type { Night } from '../domain/readiness';
 import type { Activity, HrSample, Sport } from '../domain/types';
 import type { ActivitySource } from './ActivitySource';
 
@@ -46,5 +47,21 @@ export const demoSource: ActivitySource = {
       });
     }
     return out.filter((a) => a.start >= from.getTime() && a.start < to.getTime());
+  },
+
+  hasSleepAccess: async () => true,
+  requestSleepAccess: async () => true,
+
+  async getNights(from: Date, to: Date): Promise<Night[]> {
+    const nights: Night[] = [];
+    for (let d = toDateKey(from); startOfDay(d) < to; d = addDays(d, 1)) {
+      if (startOfDay(d).getTime() + 7 * 3_600_000 > Date.now()) continue; // not woken up yet
+      nights.push({
+        date: d,
+        sleepS: (5.5 + rand(d + 'sleep') * 3) * 3600,
+        lowHr: Math.round(50 + rand(d + 'rhr') * 10),
+      });
+    }
+    return nights;
   },
 };

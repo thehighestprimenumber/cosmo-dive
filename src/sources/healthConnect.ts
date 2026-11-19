@@ -8,7 +8,9 @@ import {
   readRecords,
   requestPermission,
 } from 'react-native-health-connect';
+import { toDateKey } from '../domain/dates';
 import { dedupeActivities } from '../domain/progress';
+import { lowPoint, type Night } from '../domain/readiness';
 import type { Activity, HrSample, Sport } from '../domain/types';
 import type { ActivitySource, SourceStatus } from './ActivitySource';
 
@@ -27,6 +29,8 @@ const PERMISSIONS = [
   { accessType: 'read' as const, recordType: 'ReadHealthDataHistory' as const },
   // Lets the background sync read activities while the app is closed.
   { accessType: 'read' as const, recordType: 'BackgroundAccessPermission' as const },
+  // Optional: sleep makes goals readiness-aware.
+  { accessType: 'read' as const, recordType: 'SleepSession' as const },
 ];
 
 let initialized = false;
@@ -42,7 +46,7 @@ const between = (from: Date, to: Date) => ({
   endTime: to.toISOString(),
 });
 
-async function readAll<T extends 'ExerciseSession' | 'HeartRate'>(type: T, from: Date, to: Date) {
+async function readAll<T extends 'ExerciseSession' | 'HeartRate' | 'SleepSession'>(type: T, from: Date, to: Date) {
   const out = [];
   let pageToken: string | undefined;
   do {
@@ -55,6 +59,51 @@ async function readAll<T extends 'ExerciseSession' | 'HeartRate'>(type: T, from:
 
 export const healthConnectSource: ActivitySource = {
   name: 'Health Connect',
+
+  async hasSleepAccess() {
+    if (!(await ensureInitialized())) return false;
+    const granted = await getGrantedPermissions();
+    return granted.some((p) => p.recordType === 'SleepSession' && p.accessType === 'read');
+  },
+
+  async requestSleepAccess() {
+    if (!(await ensureInitialized())) return false;
+    const granted = await requestPermission([{ accessType: 'read', recordType: 'SleepSession' }]);
+    return granted.some((p) => p.recordType === 'SleepSession' && p.accessType === 'read');
+  },
+
+  async getNights(from: Date, to: Date): Promise<Night[]> {
+    await ensureInitialized();
+    // Start a day early so a night that began before `from` but ended inside it is included.
+    const sessions = await readAll('SleepSession', new Date(from.getTime() - 86_400_000), to);
+    const byDate = new Map<string, { start: number; end: number }[]>();
+    for (const s of sessions) {
+      const start = new Date(s.startTime).getTime();
+      const end = new Date(s.endTime).getTime();
+      const wake = new Date(end);
+      // Main sleep only: at least 2 h, ending between 03:00 and 14:00 (naps are ignored).
+      if (end - start < 2 * 3_600_000 || wake.getHours() < 3 || wake.getHours() >= 14) continue;
+      if (end < from.getTime() || end >= to.getTime()) continue;
+      const date = toDateKey(wake);
+      byDate.set(date, [...(byDate.get(date) ?? []), { start, end }]);
+    }
+    const nights: Night[] = [];
+    for (const [date, spans] of byDate) {
+      const sleepS = spans.reduce((t, s) => t + (s.end - s.start) / 1000, 0);
+      const first = Math.min(...spans.map((s) => s.start));
+      const last = Math.max(...spans.map((s) => s.end));
+      const hrRecords = await readAll('HeartRate', new Date(first), new Date(last));
+      const bpms: number[] = [];
+      for (const rec of hrRecords) {
+        for (const sample of rec.samples) {
+          const t = new Date(sample.time).getTime();
+          if (spans.some((s) => t >= s.start && t <= s.end)) bpms.push(sample.beatsPerMinute);
+        }
+      }
+      nights.push({ date, sleepS, lowHr: lowPoint(bpms) });
+    }
+    return nights.sort((a, b) => (a.date < b.date ? -1 : 1));
+  },
 
   async status(): Promise<SourceStatus> {
     const sdk = await getSdkStatus();

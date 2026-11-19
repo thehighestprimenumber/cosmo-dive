@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatKm, formatMinutes, formatValue, goalEmoji, goalSubtitle, goalTitle } from '../../domain/format';
 import { weekSummary } from '../../domain/summary';
 import type { Activity } from '../../domain/types';
+import { sourceFor } from '../../sources';
 import { useApp } from '../../state/AppState';
 import { Button, Card, ProgressBar, styles } from '../../ui/components';
 import { colors, STATUS_COLOR } from '../../ui/theme';
@@ -11,6 +12,26 @@ import { colors, STATUS_COLOR } from '../../ui/theme';
 export default function TodayScreen() {
   const { settings, snapshot, syncing, error, sourceStatus, refresh, connect } = useApp();
   const done = !!snapshot?.todayProgress?.done;
+
+  // Sleep is an optional extra permission; offer it if it's missing.
+  const [sleepAccess, setSleepAccess] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const src = settings ? sourceFor(settings) : null;
+    src?.hasSleepAccess
+      ?.()
+      .then((ok) => !cancelled && setSleepAccess(ok))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [settings]);
+  const allowSleep = async () => {
+    const src = settings ? sourceFor(settings) : null;
+    const ok = (await src?.requestSleepAccess?.().catch(() => false)) ?? false;
+    setSleepAccess(ok);
+    if (ok) refresh();
+  };
 
   // Pop the flame when today's goal flips to done.
   const [scale] = useState(() => new Animated.Value(1));
@@ -81,6 +102,8 @@ export default function TodayScreen() {
             <Text style={styles.h2}>
               {goalEmoji(goal)} {goalTitle(goal, settings)}
             </Text>
+            {snapshot.todayReadiness === 'low' && <Text style={styles.body}>🪫 Take it easier today</Text>}
+            {snapshot.todayReadiness === 'high' && <Text style={styles.body}>🔋 Well rested: a little extra today</Text>}
             <Text style={styles.muted}>{goalSubtitle(goal, settings)}</Text>
             <ProgressBar fraction={progress.fraction} done={done} />
             <Text style={styles.body}>
@@ -110,6 +133,17 @@ export default function TodayScreen() {
         {goal === undefined && !syncing && snapshot && (
           <Card>
             <Text style={styles.muted}>No goal yet. Pull down to sync.</Text>
+          </Card>
+        )}
+
+        {sleepAccess === false && (
+          <Card>
+            <Text style={styles.h2}>😴 Smarter with your sleep</Text>
+            <Text style={styles.muted}>
+              Let Daily Spark read your sleep from Health Connect. After a short night or with a raised resting heart
+              rate, your goal gets lighter; when you’re well rested, a little harder.
+            </Text>
+            <Button title="Allow sleep access" variant="secondary" onPress={allowSleep} />
           </Card>
         )}
 

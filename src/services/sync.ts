@@ -3,6 +3,7 @@ import { deleteGoal, insertGoal, lastGoalDate, loadGoals, loadResults, saveResul
 import { addDays, dateRange, endOfDay, startOfDay, toDateKey } from '../domain/dates';
 import { generateGoal, LOOKBACK_DAYS, PLAN_VERSION } from '../domain/generator';
 import { activitiesOn, progressOf } from '../domain/progress';
+import { readinessFor, type Night, type ReadinessLevel } from '../domain/readiness';
 import { computeStreak, type StreakState } from '../domain/streak';
 import type { Activity, DateKey, DayResult, DayStatus, GoalSpec, Progress, Settings } from '../domain/types';
 import type { ActivitySource } from '../sources/ActivitySource';
@@ -25,6 +26,7 @@ export type Snapshot = {
   todayGoal: GoalSpec | null | undefined;
   /** Why today's goal is what it is. */
   todayNotes: string[];
+  todayReadiness: ReadinessLevel;
   todayProgress: Progress | null;
   todayActivities: Activity[];
   streak: StreakState;
@@ -61,7 +63,19 @@ export async function refresh(
 
   const goals = new Map((await loadGoals(db, start, today)).map((g) => [g.date, g]));
   const todays = goals.get(today);
-  const mayReplaceToday = !!todays && (opts.regenerateToday || todays.planVersion < PLAN_VERSION);
+
+  // Sleep for readiness: needed when making goals, or to redo today's goal once
+  // last night's sleep has synced (it was made before you woke up).
+  const waitingForSleep = todays?.meta?.readiness === 'unknown';
+  const nightsFrom = addDays(minKey(generateFrom, today), -16);
+  const nights =
+    source.getNights && (generateFrom <= today || waitingForSleep)
+      ? await source.getNights(startOfDay(nightsFrom), endOfDay(today)).catch(() => [] as Night[])
+      : [];
+  const sleepArrived = waitingForSleep && nights.some((n) => n.date === today);
+
+  const mayReplaceToday =
+    !!todays && (opts.regenerateToday || todays.planVersion < PLAN_VERSION || sleepArrived);
 
   // Generating a goal needs LOOKBACK_DAYS of history; otherwise only the re-checked days.
   const firstToGenerate = mayReplaceToday ? minKey(generateFrom, today) : generateFrom;
@@ -88,7 +102,8 @@ export async function refresh(
     let daily = goals.get(date);
     if (!daily && date >= generateFrom) {
       const statuses = computeStreak(history, date, settings.restDaysPerWeek).statuses;
-      daily = generateGoal({ date, settings, activities, history, statuses });
+      const readiness = source.getNights ? readinessFor(date, nights) : undefined;
+      daily = generateGoal({ date, settings, activities, history, statuses, readiness });
       await insertGoal(db, daily);
       goals.set(date, daily);
     }
@@ -126,6 +141,7 @@ export async function refresh(
     today,
     todayGoal,
     todayNotes: goals.get(today)?.meta?.notes ?? [],
+    todayReadiness: goals.get(today)?.meta?.readiness ?? 'unknown',
     todayProgress: todayGoal ? progressOf(todayGoal, todayActivities, settings) : null,
     todayActivities,
     streak,

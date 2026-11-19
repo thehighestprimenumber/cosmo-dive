@@ -6,6 +6,7 @@ import { loadSettings } from '../data/db';
 import { addDays, startOfDay, toDateKey } from '../domain/dates';
 import { formatKm, formatMinutes } from '../domain/format';
 import { baselineFor, LOOKBACK_DAYS, MIN_BASELINE_ACTIVITY_S } from '../domain/generator';
+import type { Night } from '../domain/readiness';
 import type { Activity, GoalSpec, Settings } from '../domain/types';
 import { backgroundSyncStatus } from '../services/backgroundSync';
 import { sourceFor } from '../sources';
@@ -24,6 +25,8 @@ type Report = {
   sessions: RawSession[] | null;
   activities: Activity[];
   baselines: { label: string; value: string }[];
+  sleepAccess: boolean | null;
+  nights: Night[];
   error: string | null;
 };
 
@@ -41,6 +44,8 @@ async function buildReport(db: SQLiteDatabase): Promise<Report> {
     sessions: null,
     activities: [],
     baselines: [],
+    sleepAccess: null,
+    nights: [],
     error: null,
   };
   try {
@@ -54,6 +59,11 @@ async function buildReport(db: SQLiteDatabase): Promise<Report> {
       const from = startOfDay(addDays(toDateKey(to), -DAYS));
       if (settings.dataSource === 'health_connect') r.sessions = await listRawSessions(from, to);
       r.activities = await source.getActivities(from, to);
+
+      r.sleepAccess = (await source.hasSleepAccess?.().catch(() => false)) ?? null;
+      if (r.sleepAccess && source.getNights) {
+        r.nights = (await source.getNights(from, to).catch(() => [])).reverse();
+      }
 
       // The same "typical day" numbers the goal generator uses.
       const lookbackFrom = startOfDay(addDays(toDateKey(to), -LOOKBACK_DAYS));
@@ -164,6 +174,23 @@ export default function DiagnosticsScreen() {
                 </Text>
               </Card>
             )}
+
+            <Card>
+              <Label>Sleep (for readiness)</Label>
+              <Row k="Sleep access" v={report.sleepAccess ? 'yes' : 'no'} ok={!!report.sleepAccess} />
+              {report.sleepAccess && report.nights.length === 0 && (
+                <Text style={styles.muted}>
+                  No nights found. Check Samsung Health → Settings → Health Connect shares sleep.
+                </Text>
+              )}
+              {report.nights.map((n) => (
+                <Row
+                  key={n.date}
+                  k={new Date(n.date + 'T12:00:00').toLocaleDateString([], { weekday: 'short', day: 'numeric' })}
+                  v={`${formatMinutes(n.sleepS)}${n.lowHr != null ? ` · low HR ${n.lowHr} bpm` : ''}`}
+                />
+              ))}
+            </Card>
 
             <Card>
               <Label>Background sync</Label>
