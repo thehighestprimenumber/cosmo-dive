@@ -181,3 +181,25 @@ describe('format', () => {
     expect(goalTitle({ kind: 'hr_zone', zone: 2, seconds: 1200 }, settings)).toBe('20 min in Zone 2');
   });
 });
+
+describe('weekSummary', () => {
+  it('counts done and planned training days this week', async () => {
+    const { weekSummary } = await import('./summary');
+    const statuses = new Map([
+      ['2026-11-16', 'done'],
+      ['2026-11-17', 'rest'],
+      ['2026-11-18', 'missed'],
+      ['2026-11-19', 'pending'],
+    ] as const);
+    const s = weekSummary(new Map(statuses), '2026-11-19', [2, 5], '2026-11-02');
+    expect(s.days.map((d) => d.status)).toEqual(['done', 'rest', 'missed', 'pending', 'rest', 'future', 'future']);
+    expect(s.done).toBe(1);
+    expect(s.planned).toBe(5); // Mon, Wed, Thu, Sat, Sun
+  });
+
+  it('ignores days before the plan started', async () => {
+    const { weekSummary } = await import('./summary');
+    const s = weekSummary(new Map([['2026-11-19', 'pending']]), '2026-11-19', [], '2026-11-19');
+    expect(s.planned).toBe(4); // Thu–Sun
+  });
+});

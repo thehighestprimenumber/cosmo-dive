@@ -13,7 +13,8 @@ permissions:
 
 concurrency:
   group: apk-${{ github.ref }}
-  cancel-in-progress: true
+  # Queue new pushes instead of cancelling a build that may be about to publish.
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -102,7 +103,16 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          script: ./scripts/smoke-test.sh "$(ls daily-spark-*.apk | head -1)"
+          # The launch check gates publishing; the walkthrough only reports.
+          script: ./scripts/smoke-test.sh "$(ls daily-spark-*.apk | head -1)" || exit 1; ./scripts/walkthrough.sh > walkthrough.log 2>&1 || touch walkthrough-failed; cat walkthrough.log || true
+
+      - name: Report walkthrough
+        if: always()
+        run: |
+          if [ -f walkthrough-failed ]; then
+            echo "::warning::Emulator walkthrough failed. See walkthrough.log and shots/ in the smoke-test-logs artifact."
+            cat walkthrough.log || true
+          fi
 
       - uses: actions/upload-artifact@v5
         if: always()
@@ -112,6 +122,8 @@ jobs:
             logcat.txt
             screenshot.png
             ui.xml
+            walkthrough.log
+            shots/
 
   publish:
     needs: [build, smoke-test]

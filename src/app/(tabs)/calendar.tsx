@@ -6,16 +6,7 @@ import { formatValue, goalEmoji, goalTitle } from '../../domain/format';
 import type { DateKey, DayStatus } from '../../domain/types';
 import { useApp } from '../../state/AppState';
 import { Card, styles } from '../../ui/components';
-import { colors } from '../../ui/theme';
-
-const STATUS_COLOR: Record<DayStatus, string> = {
-  done: colors.done,
-  missed: colors.missed,
-  frozen: colors.frozen,
-  rest: colors.rest,
-  pending: colors.pending,
-  none: 'transparent',
-};
+import { colors, STATUS_COLOR } from '../../ui/theme';
 
 const STATUS_LABEL: Record<DayStatus, string> = {
   done: 'Done',

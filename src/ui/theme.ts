@@ -1,3 +1,5 @@
+import type { DayStatus } from '../domain/types';
+
 export const colors = {
   bg: '#14110F',
   card: '#221D1A',
@@ -15,3 +17,13 @@ export const colors = {
 
 export const radius = 16;
 export const gap = 16;
+
+export const STATUS_COLOR: Record<DayStatus | 'future', string> = {
+  done: colors.done,
+  missed: colors.missed,
+  frozen: colors.frozen,
+  rest: colors.rest,
+  pending: colors.pending,
+  none: 'transparent',
+  future: colors.cardBorder,
+};

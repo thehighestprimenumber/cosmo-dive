@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatKm, formatMinutes, formatValue, goalEmoji, goalSubtitle, goalTitle } from '../../domain/format';
+import { weekSummary } from '../../domain/summary';
 import type { Activity } from '../../domain/types';
 import { useApp } from '../../state/AppState';
 import { Button, Card, ProgressBar, styles } from '../../ui/components';
-import { colors } from '../../ui/theme';
+import { colors, STATUS_COLOR } from '../../ui/theme';
 
 export default function TodayScreen() {
   const { settings, snapshot, syncing, error, sourceStatus, refresh, connect } = useApp();
@@ -95,6 +96,14 @@ export default function TodayScreen() {
           </Card>
         )}
 
+        {/* This week */}
+        {snapshot && (
+          <WeekCard
+            summary={weekSummary(snapshot.streak.statuses, snapshot.today, settings.restDays, settings.startDate)}
+            today={snapshot.today}
+          />
+        )}
+
         {/* Today's activities */}
         {snapshot && snapshot.todayActivities.length > 0 && (
           <Card>
@@ -111,6 +120,38 @@ export default function TodayScreen() {
         </Text>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+function WeekCard({ summary, today }: { summary: ReturnType<typeof weekSummary>; today: string }) {
+  return (
+    <Card>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <Text style={styles.label}>This week</Text>
+        <Text style={styles.body}>
+          {summary.done}/{summary.planned} goals
+        </Text>
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+        {summary.days.map((d, i) => (
+          <View key={d.date} style={{ alignItems: 'center', gap: 4 }}>
+            <View
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: STATUS_COLOR[d.status],
+                borderWidth: d.date === today ? 2 : 0,
+                borderColor: colors.text,
+              }}
+            />
+            <Text style={styles.muted}>{DAY_LETTERS[i]}</Text>
+          </View>
+        ))}
+      </View>
+    </Card>
   );
 }
 
