@@ -90,6 +90,10 @@ export type Settings = {
   lastCelebrated: DateKey | null;
   /** Epoch ms of the last successful background sync (shown in Diagnostics). */
   lastBackgroundSync: number | null;
+  /** Monthly km challenge targets, fixed the first time each month is seen ("2026-11" → km). */
+  monthTargets: Record<string, number>;
+  /** Unlocked achievements → date unlocked. Never removed. */
+  achievements: Record<string, DateKey>;
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -103,6 +107,8 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   onboarded: false,
   lastCelebrated: null,
   lastBackgroundSync: null,
+  monthTargets: {},
+  achievements: {},
 };
 
 export type Progress = {

@@ -21,6 +21,11 @@ Daily Spark reads the walks and rides your Galaxy Watch records (Samsung Health 
   - Goals stay between 80% and 150% of your typical day.
   - **Readiness** (optional sleep permission): after a short night (under 5.5 h, or 20% below your usual) or a resting heart rate 5+ bpm above your 2-week usual, today's goal is 15% lighter. Well rested with a low resting heart rate: 5% harder. A goal made before you woke up is redone once last night's sleep syncs (unless you've already done it). These tweaks apply to today only and never lower the plan.
   - Each goal lists *why* it is what it is under **Why this goal**.
+- **Game**:
+  - ⚔️ **Boss day**: one random day each week, the goal is 25% harder and worth 30 XP.
+  - **XP and levels**: 10 XP per goal plus a streak bonus (up to +10), and +25 for a perfect week. Levels at 100, 300, 600, 1000 XP…
+  - **Monthly challenge**: walking km this month vs. last month + 10%. The target is fixed when the month starts.
+  - 🏆 **Achievements** (streaks, bosses, perfect week, all-rounder, comeback, monthly champion, 100 km month, level 5). Once unlocked, they stay unlocked.
 - **Reminders**: a morning reminder, an evening "save your streak" reminder, and (optional) a nudge 30 minutes before the time you usually start moving, learned from the last 4 weeks. The last two only fire while today's goal isn't done.
 - **Background sync**: about every 30 minutes (Android decides exactly when), the app reads Health Connect, notifies you once when today's goal is done, and keeps the evening reminder up to date.
 - **Backup**: **Settings → Export history** saves your goal history to a JSON file (e.g. to Google Drive). **Import history** merges it on a new phone and recalculates your streak.

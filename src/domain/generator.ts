@@ -1,5 +1,6 @@
 import { addDays, daysBetween, mondayOf, toDateKey } from './dates';
 import { formatKm, formatMinutes } from './format';
+import { BOSS_FACTOR, isBossDay, XP } from './game';
 import { measure } from './progress';
 import type { Readiness } from './readiness';
 import type {
@@ -20,7 +21,7 @@ import type {
  * that created them, so old history never gets silently reinterpreted, and
  * goals from older versions are never used as a starting point.
  */
-export const PLAN_VERSION = 3;
+export const PLAN_VERSION = 4;
 
 /** How far back "your typical day" looks. */
 export const LOOKBACK_DAYS = 90;
@@ -152,13 +153,18 @@ export function generateGoal({ date, settings, activities, history, statuses, re
     target *= readiness.factor;
     notes.push(...readiness.notes);
   }
+  const boss = isBossDay(date);
+  if (boss) {
+    target *= BOSS_FACTOR;
+    notes.push(`⚔️ Boss day: 25% harder, worth ${XP.boss} XP.`);
+  }
   target = clamp(roundTo(target, STEP[kind]), LIMITS[kind][0], LIMITS[kind][1]);
 
   return {
     date,
     goal: withTarget(spec, target),
     planVersion: PLAN_VERSION,
-    meta: { base: roundTo(base, STEP[kind]), notes, readiness: readiness?.level ?? 'unknown' },
+    meta: { base: roundTo(base, STEP[kind]), notes, readiness: readiness?.level ?? 'unknown', ...(boss ? { boss } : {}) },
   };
 }
 

@@ -1,7 +1,8 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { saveSettings } from '../data/db';
 import type { Settings } from '../domain/types';
-import { notifyGoalComplete, updateEvening, updateNudge } from './notifications';
+import { ACHIEVEMENTS } from '../domain/game';
+import { notifyAchievements, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
 import type { Snapshot } from './sync';
 
 /**
@@ -16,6 +17,10 @@ export async function afterSync(
   { inBackground }: { inBackground: boolean },
 ): Promise<void> {
   const done = !!snap.todayProgress?.done;
+  if (inBackground && snap.game.newlyUnlocked.length) {
+    const titles = snap.game.newlyUnlocked.map((id) => ACHIEVEMENTS.find((a) => a.id === id)?.title ?? id);
+    await notifyAchievements(titles);
+  }
   await updateEvening(settings, snap.today, snap.todayGoal, done, snap.streak.current);
   await updateNudge(settings, snap.today, snap.todayGoal, done, snap.usualTime);
 

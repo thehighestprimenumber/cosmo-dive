@@ -55,6 +55,18 @@ export async function notifyGoalComplete(settings: Settings, goal: GoalSpec, str
   });
 }
 
+/** New achievements unlocked by a background sync. */
+export async function notifyAchievements(titles: string[]): Promise<void> {
+  if (!titles.length) return;
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: titles.length === 1 ? `🏆 Achievement unlocked: ${titles[0]}` : `🏆 ${titles.length} achievements unlocked`,
+      body: titles.length === 1 ? 'Open Daily Spark to see it.' : titles.join(' · '),
+    },
+    trigger: { channelId: CHANNEL },
+  });
+}
+
 /**
  * "You usually head out around 18:00" nudge, 30 min before your learned
  * usual time, for today only and only while the goal isn't done.

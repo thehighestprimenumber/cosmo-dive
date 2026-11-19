@@ -1,9 +1,11 @@
+import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Animated, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatKm, formatMinutes, formatValue, goalEmoji, goalSubtitle, goalTitle } from '../../domain/format';
 import { weekSummary } from '../../domain/summary';
 import type { Activity } from '../../domain/types';
+import { ACHIEVEMENTS } from '../../domain/game';
 import { sourceFor } from '../../sources';
 import { useApp } from '../../state/AppState';
 import { Button, Card, ProgressBar, styles } from '../../ui/components';
@@ -12,6 +14,10 @@ import { colors, STATUS_COLOR } from '../../ui/theme';
 export default function TodayScreen() {
   const { settings, snapshot, syncing, error, sourceStatus, refresh, connect } = useApp();
   const done = !!snapshot?.todayProgress?.done;
+  const game = snapshot?.game;
+  const unlockedToday = game
+    ? ACHIEVEMENTS.filter((a) => game.achievements[a.id] === snapshot?.today)
+    : [];
 
   // Sleep is an optional extra permission; offer it if it's missing.
   const [sleepAccess, setSleepAccess] = useState<boolean | null>(null);
@@ -66,7 +72,29 @@ export default function TodayScreen() {
             {'🧊'.repeat(streak?.freezes ?? 0) || 'No freezes'}
             {'  ·  '}next freeze in {streak?.nextFreezeIn ?? 7} done days
           </Text>
+          {game && (
+            <View style={{ alignSelf: 'stretch', marginTop: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={styles.body}>⭐ Level {game.level}</Text>
+                <Text style={styles.muted}>
+                  {game.into} / {game.needed} XP
+                </Text>
+              </View>
+              <ProgressBar fraction={game.into / game.needed} done={false} />
+            </View>
+          )}
         </View>
+
+        {unlockedToday.length > 0 && (
+          <Card style={{ borderColor: colors.pending }}>
+            <Text style={styles.label}>New achievement{unlockedToday.length > 1 ? 's' : ''}</Text>
+            {unlockedToday.map((a) => (
+              <Text key={a.id} style={styles.h2}>
+                {a.emoji} {a.title}
+              </Text>
+            ))}
+          </Card>
+        )}
 
         {sourceStatus && sourceStatus.state !== 'ready' && (
           <Card style={{ borderColor: colors.pending }}>
@@ -98,7 +126,7 @@ export default function TodayScreen() {
         )}
         {goal && progress && (
           <Card style={done ? { borderColor: colors.done } : undefined}>
-            <Text style={styles.label}>Today’s goal</Text>
+            <Text style={styles.label}>{snapshot.todayBoss ? '⚔️ Boss day' : 'Today’s goal'}</Text>
             <Text style={styles.h2}>
               {goalEmoji(goal)} {goalTitle(goal, settings)}
             </Text>
@@ -145,6 +173,35 @@ export default function TodayScreen() {
             </Text>
             <Button title="Allow sleep access" variant="secondary" onPress={allowSleep} />
           </Card>
+        )}
+
+        {/* This month */}
+        {game && (
+          <Card>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Text style={styles.label}>
+                {new Date(game.month + '-15').toLocaleDateString([], { month: 'long' })} challenge
+              </Text>
+              <Text style={styles.body}>
+                {Math.round(game.monthKm)} / {game.monthTarget} km
+              </Text>
+            </View>
+            <ProgressBar fraction={Math.min(1, game.monthKm / game.monthTarget)} done={game.monthKm >= game.monthTarget} />
+            <Text style={styles.hint}>Walking km this month (rides count 1/{settings.rideFactor}). Target: last month + 10%.</Text>
+          </Card>
+        )}
+
+        {game && (
+          <Pressable onPress={() => router.push('/achievements')}>
+            <Card>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={styles.body}>
+                  🏆 {Object.keys(game.achievements).length} of {ACHIEVEMENTS.length} achievements
+                </Text>
+                <Text style={styles.muted}>See all ›</Text>
+              </View>
+            </Card>
+          </Pressable>
         )}
 
         {/* This week */}

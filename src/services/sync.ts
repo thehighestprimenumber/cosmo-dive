@@ -1,12 +1,21 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { deleteGoal, insertGoal, lastGoalDate, loadGoals, loadResults, saveResults } from '../data/db';
+import { deleteGoal, insertGoal, lastGoalDate, loadGoals, loadResults, saveResults, saveSettings } from '../data/db';
+import {
+  earnedAchievements,
+  levelFor,
+  monthKm,
+  monthOf,
+  monthTarget,
+  totalXp,
+  type AchievementId,
+} from '../domain/game';
 import { addDays, dateRange, endOfDay, startOfDay, toDateKey } from '../domain/dates';
 import { generateGoal, LOOKBACK_DAYS, PLAN_VERSION } from '../domain/generator';
 import { activitiesOn, progressOf } from '../domain/progress';
 import { usualStartTime, type TimeOfDay } from '../domain/habits';
 import { readinessFor, type Night, type ReadinessLevel } from '../domain/readiness';
 import { computeStreak, type StreakState } from '../domain/streak';
-import type { Activity, DateKey, DayResult, DayStatus, GoalSpec, Progress, Settings } from '../domain/types';
+import type { Activity, DateKey, DayResult, DayStatus, GoalMeta, GoalSpec, Progress, Settings } from '../domain/types';
 import type { ActivitySource } from '../sources/ActivitySource';
 
 /** Days that are always re-checked against Health Connect (late syncs, edits, deletions). */
@@ -20,6 +29,7 @@ export type DayView = {
   value: number;
   done: boolean;
   status: DayStatus;
+  meta?: GoalMeta;
 };
 
 export type Snapshot = {
@@ -30,6 +40,20 @@ export type Snapshot = {
   todayReadiness: ReadinessLevel;
   /** When you usually start moving, learned from the last 4 weeks. */
   usualTime: TimeOfDay | null;
+  todayBoss: boolean;
+  game: {
+    xp: number;
+    level: number;
+    /** XP into the current level, and XP the level spans. */
+    into: number;
+    needed: number;
+    month: string;
+    monthKm: number;
+    monthTarget: number;
+    achievements: Record<string, DateKey>;
+    /** Achievements unlocked by this sync. */
+    newlyUnlocked: AchievementId[];
+  };
   todayProgress: Progress | null;
   todayActivities: Activity[];
   streak: StreakState;
@@ -138,9 +162,51 @@ export async function refresh(
     history.map((h) => [h.date, { ...h, status: streak.statuses.get(h.date) ?? 'none' }]),
   );
 
+  // Game: XP and level, this month's challenge, achievements (unlocks are stored).
+  const xp = totalXp(history, streak.statuses, settings.restDaysPerWeek);
+  const lvl = levelFor(xp);
+  const month = monthOf(today);
+  const kmThisMonth = monthKm(activities, month, settings.rideFactor);
+  let target = settings.monthTargets[month];
+  const settingsPatch: Partial<Settings> = {};
+  if (target == null) {
+    target = monthTarget(month, activities, fetchFrom, settings.rideFactor);
+    settingsPatch.monthTargets = { ...settings.monthTargets, [month]: target };
+  }
+  const earned = earnedAchievements({
+    days: history,
+    statuses: streak.statuses,
+    longestStreak: streak.longest,
+    restDaysPerWeek: settings.restDaysPerWeek,
+    level: lvl.level,
+    monthKm: kmThisMonth,
+    monthTarget: target,
+  });
+  const newlyUnlocked = earned.filter((id) => !settings.achievements[id]);
+  if (newlyUnlocked.length) {
+    settingsPatch.achievements = {
+      ...settings.achievements,
+      ...Object.fromEntries(newlyUnlocked.map((id) => [id, today])),
+    };
+  }
+  if (Object.keys(settingsPatch).length) {
+    await saveSettings(db, settingsPatch);
+    Object.assign(settings, settingsPatch);
+  }
+
   const todayGoal = goals.get(today)?.goal;
   const todayActivities = activitiesOn(today, activities);
   return {
+    game: {
+      xp,
+      ...lvl,
+      month,
+      monthKm: kmThisMonth,
+      monthTarget: target,
+      achievements: settings.achievements,
+      newlyUnlocked,
+    },
+    todayBoss: !!goals.get(today)?.meta?.boss,
     today,
     todayGoal,
     todayNotes: goals.get(today)?.meta?.notes ?? [],

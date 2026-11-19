@@ -117,7 +117,7 @@ export default function CalendarScreen() {
             {day ? (
               <>
                 <Text style={styles.h2}>
-                  {goalEmoji(day.goal)} {day.goal ? goalTitle(day.goal, settings) : 'Rest day'}
+                  {day.meta?.boss ? '⚔️ ' : ''}{goalEmoji(day.goal)} {day.goal ? goalTitle(day.goal, settings) : 'Rest day'}
                 </Text>
                 <Text style={styles.muted}>
                   {STATUS_LABEL[day.status]}
