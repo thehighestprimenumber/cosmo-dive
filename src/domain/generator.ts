@@ -16,9 +16,11 @@ import type {
  * Bump this whenever the rules below change. Stored goals keep the version
  * that created them, so old history never gets silently reinterpreted.
  */
-export const PLAN_VERSION = 1;
+export const PLAN_VERSION = 2;
 
 const LOOKBACK_DAYS = 28;
+/** Shorter activities (e.g. auto-detected errands) don't shape your baseline. */
+const MIN_BASELINE_ACTIVITY_S = 10 * 60;
 const PROGRESS_UP = 1.07; // doing well on this goal type (max once a week per type)
 const EASE_OFF = 0.85; // missed the last two training days
 const RECOVERY = 0.75; // every 4th week is easier
@@ -104,6 +106,9 @@ export function generateGoal({ date, settings, activities, history }: GeneratorI
   if (recovery) target *= RECOVERY;
   target = clamp(roundTo(target, STEP[kind]), LIMITS[kind][0], LIMITS[kind][1]);
 
+  // 4. Your own floor always wins, even in a recovery week.
+  if (kind === 'distance') target = Math.max(target, settings.minDistanceKm * 1000);
+
   return make(withTarget(spec, target));
 }
 
@@ -148,6 +153,7 @@ function withTarget(g: GoalSpec, target: number): GoalSpec {
 function dailyBaseline(spec: GoalSpec, recent: Activity[], settings: Settings): number | null {
   const byDay = new Map<DateKey, Activity[]>();
   for (const a of recent) {
+    if (a.durationS < MIN_BASELINE_ACTIVITY_S) continue;
     if (spec.kind === 'hr_zone' && a.hr.length < 2) continue;
     const d = toDateKey(a.start);
     byDay.set(d, [...(byDay.get(d) ?? []), a]);

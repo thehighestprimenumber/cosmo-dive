@@ -17,7 +17,7 @@ type Ctx = {
   sourceStatus: SourceStatus | null;
   syncing: boolean;
   error: string | null;
-  refresh: (opts?: { fullRebuild?: boolean }) => Promise<void>;
+  refresh: (opts?: { fullRebuild?: boolean; regenerateToday?: boolean }) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
   /** Re-reads settings from the database (e.g. after an import) and rebuilds history. */
   reloadAll: () => Promise<void>;
@@ -38,7 +38,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const inFlight = useRef<Promise<void> | null>(null);
 
   const doRefresh = useCallback(
-    async (opts: { fullRebuild?: boolean } = {}) => {
+    async (opts: { fullRebuild?: boolean; regenerateToday?: boolean } = {}) => {
       const s = settingsRef.current;
       if (!s?.onboarded) return;
       if (inFlight.current) return inFlight.current;

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatKm, formatMinutes, formatValue, goalEmoji, goalSubtitle, goalTitle } from '../../domain/format';
+import { REST_BONUS_SECONDS, restDayResult } from '../../domain/progress';
 import { weekSummary } from '../../domain/summary';
 import type { Activity } from '../../domain/types';
 import { useApp } from '../../state/AppState';
@@ -10,7 +11,8 @@ import { colors, STATUS_COLOR } from '../../ui/theme';
 
 export default function TodayScreen() {
   const { settings, snapshot, syncing, error, sourceStatus, refresh, connect } = useApp();
-  const done = !!snapshot?.todayProgress?.done;
+  const restToday = snapshot && snapshot.todayGoal === null ? restDayResult(snapshot.todayActivities) : null;
+  const done = !!snapshot?.todayProgress?.done || !!restToday?.done;
 
   // Pop the flame when today's goal flips to done.
   const [scale] = useState(() => new Animated.Value(1));
@@ -71,8 +73,20 @@ export default function TodayScreen() {
         {/* Today's goal */}
         {goal === null && (
           <Card>
-            <Text style={styles.h2}>😴 Rest day</Text>
-            <Text style={styles.muted}>Recovery is part of the plan. Your streak is safe today.</Text>
+            <Text style={styles.h2}>{restToday?.done ? '💜 Bonus day!' : '😴 Rest day'}</Text>
+            <Text style={styles.muted}>
+              {restToday?.done
+                ? 'You moved on a rest day, so today counts toward your streak.'
+                : `Your streak is safe today. Move ${formatMinutes(REST_BONUS_SECONDS)} anyway and it counts as a bonus day.`}
+            </Text>
+            {restToday && (
+              <>
+                <ProgressBar fraction={Math.min(1, restToday.value / REST_BONUS_SECONDS)} done={restToday.done} />
+                <Text style={styles.body}>
+                  {formatMinutes(restToday.value)} of {formatMinutes(REST_BONUS_SECONDS)}
+                </Text>
+              </>
+            )}
           </Card>
         )}
         {goal && progress && (

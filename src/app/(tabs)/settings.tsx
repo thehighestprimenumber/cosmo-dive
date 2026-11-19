@@ -24,6 +24,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
   const [restDays, setRestDays] = useState<number[]>(settings.restDays);
   const [maxHr, setMaxHr] = useState(String(settings.maxHr));
   const [rideFactor, setRideFactor] = useState(String(settings.rideFactor));
+  const [minKm, setMinKm] = useState(String(settings.minDistanceKm));
   const [morning, setMorning] = useState(settings.morningReminder);
   const [evening, setEvening] = useState(settings.eveningReminder);
 
@@ -32,10 +33,19 @@ function SettingsForm({ settings }: { settings: Settings }) {
     const factor = Number(rideFactor.replace(',', '.'));
     if (!(hr >= 120 && hr <= 230)) return Alert.alert('Max heart rate should be between 120 and 230.');
     if (!(factor >= 1 && factor <= 10)) return Alert.alert('Ride factor should be between 1 and 10.');
+    const min = Number(minKm.replace(',', '.'));
+    if (!(min >= 0 && min <= 40)) return Alert.alert('Minimum distance should be between 0 and 40 km.');
     if (!parseTime(morning) || !parseTime(evening)) return Alert.alert('Reminder times should look like 08:00.');
-    await updateSettings({ restDays, maxHr: hr, rideFactor: factor, morningReminder: morning, eveningReminder: evening });
-    await refresh();
-    Alert.alert('Saved', 'Changes apply to goals from tomorrow. Today’s goal stays as it is.');
+    await updateSettings({
+      restDays,
+      maxHr: hr,
+      rideFactor: factor,
+      minDistanceKm: min,
+      morningReminder: morning,
+      eveningReminder: evening,
+    });
+    await refresh({ regenerateToday: true });
+    Alert.alert('Saved', 'Today’s goal was updated too, unless you had already completed it.');
   };
 
   const doExport = async () => {
@@ -83,6 +93,13 @@ function SettingsForm({ settings }: { settings: Settings }) {
                 ? `Zone 2 = ${zoneRange(2, Number(maxHr)).join('–')} bpm · Zone 3 = ${zoneRange(3, Number(maxHr)).join('–')} bpm`
                 : undefined
             }
+          />
+          <Field
+            label="Minimum distance (km)"
+            value={minKm}
+            onChangeText={setMinKm}
+            keyboardType="decimal-pad"
+            hint="Distance goals are never shorter than this (walking; rides count 1/ride factor)."
           />
           <Field
             label="Ride factor"

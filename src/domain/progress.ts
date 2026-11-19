@@ -2,6 +2,15 @@ import { toDateKey } from './dates';
 import type { Activity, DateKey, GoalSpec, Progress, Settings } from './types';
 import { secondsInZone } from './zones';
 
+/** Moving at least this long on a rest day turns it into a bonus day. */
+export const REST_BONUS_SECONDS = 20 * 60;
+
+/** A rest day's result: total minutes moved, and whether that earns a bonus day. */
+export function restDayResult(activities: Activity[]): { value: number; done: boolean } {
+  const value = activities.reduce((s, a) => s + a.durationS, 0);
+  return { value, done: value >= REST_BONUS_SECONDS };
+}
+
 /** Distance in walk-equivalent metres: rides count 1/rideFactor. */
 export function walkEquivalentMeters(a: Activity, rideFactor: number): number {
   if (a.distanceM == null) return 0;

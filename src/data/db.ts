@@ -92,6 +92,15 @@ export async function insertGoal(db: SQLiteDatabase, g: DailyGoal): Promise<void
   );
 }
 
+/**
+ * The only place a goal is ever removed: replacing today's not-yet-completed
+ * goal (rules or settings changed). Past goals are never touched.
+ */
+export async function deleteGoal(db: SQLiteDatabase, date: DateKey): Promise<void> {
+  await db.runAsync('DELETE FROM goals WHERE date = ?', date);
+  await db.runAsync('DELETE FROM day_results WHERE date = ?', date);
+}
+
 // ---- day results cache ----
 
 export async function loadResults(

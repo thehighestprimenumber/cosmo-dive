@@ -7,7 +7,8 @@ import { computeStreak } from './streak';
 import { DEFAULT_SETTINGS, type Activity, type DayResult, type Settings } from './types';
 import { secondsInZone, zoneOf } from './zones';
 
-const settings: Settings = { ...DEFAULT_SETTINGS, startDate: '2026-11-02', onboarded: true };
+// No distance floor here, so progression maths is visible; the floor has its own test.
+const settings: Settings = { ...DEFAULT_SETTINGS, minDistanceKm: 0, startDate: '2026-11-02', onboarded: true };
 
 function act(date: string, opts: Partial<Activity> & { hourStart?: number; minutes?: number } = {}): Activity {
   const start = startOfDay(date).getTime() + (opts.hourStart ?? 9) * 3_600_000;
@@ -201,5 +202,55 @@ describe('weekSummary', () => {
     const { weekSummary } = await import('./summary');
     const s = weekSummary(new Map([['2026-11-19', 'pending']]), '2026-11-19', [], '2026-11-19');
     expect(s.planned).toBe(4); // Thu–Sun
+  });
+});
+
+describe('smarter goals (v2)', () => {
+  const distanceDay = () => {
+    let d = '2026-11-18';
+    while (settings.restDays.includes(weekday(d)) || kindForDay(d, settings, false) !== 'distance') d = addDays(d, 1);
+    return d;
+  };
+
+  it('never sets a distance goal below the minimum', () => {
+    const date = distanceDay();
+    const acts = Array.from({ length: 10 }, (_, i) => act(addDays(date, -(i + 1)), { minutes: 30, distanceM: 2300 }));
+    const g = generateGoal({ date, settings: { ...settings, minDistanceKm: 5 }, activities: acts, history: [] }).goal!;
+    expect(g.kind).toBe('distance');
+    expect((g as { meters: number }).meters).toBe(5000);
+  });
+
+  it('ignores short auto-detected walks when finding your baseline', () => {
+    const date = distanceDay();
+    const acts: Activity[] = [];
+    for (let i = 1; i <= 10; i++) {
+      const d = addDays(date, -i);
+      acts.push(act(d, { minutes: 60, distanceM: 6000 }));
+      acts.push(act(d, { id: `${d}-errand`, hourStart: 14, minutes: 6, distanceM: 400 }));
+      acts.push(act(addDays(date, -i - 10), { id: `${d}-only-errand`, hourStart: 15, minutes: 5, distanceM: 300 }));
+    }
+    const g = generateGoal({ date, settings, activities: acts, history: [] }).goal!;
+    // Short errands neither add to the long walks' days nor create low days of their own.
+    expect((g as { meters: number }).meters).toBe(6000);
+  });
+
+  it('counts moving on a rest day as a bonus day', () => {
+    const goal = { kind: 'duration' as const, seconds: 1800 };
+    const s = computeStreak(
+      [
+        { date: '2026-11-16', goal, value: 0, done: true },
+        { date: '2026-11-17', goal: null, value: 1500, done: true },
+        { date: '2026-11-18', goal, value: 0, done: true },
+      ],
+      '2026-11-18',
+    );
+    expect(s.statuses.get('2026-11-17')).toBe('bonus');
+    expect(s.current).toBe(3);
+  });
+
+  it('needs 20 minutes on a rest day for the bonus', async () => {
+    const { restDayResult } = await import('./progress');
+    expect(restDayResult([act('2026-11-17', { minutes: 12 })]).done).toBe(false);
+    expect(restDayResult([act('2026-11-17', { minutes: 12 }), act('2026-11-17', { hourStart: 18, minutes: 9 })]).done).toBe(true);
   });
 });

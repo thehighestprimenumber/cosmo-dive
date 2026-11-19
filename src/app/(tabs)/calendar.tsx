@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addDays, mondayOf } from '../../domain/dates';
-import { formatValue, goalEmoji, goalTitle } from '../../domain/format';
+import { formatMinutes, formatValue, goalEmoji, goalTitle } from '../../domain/format';
 import type { DateKey, DayStatus } from '../../domain/types';
 import { useApp } from '../../state/AppState';
 import { Card, styles } from '../../ui/components';
@@ -10,6 +10,7 @@ import { colors, STATUS_COLOR } from '../../ui/theme';
 
 const STATUS_LABEL: Record<DayStatus, string> = {
   done: 'Done',
+  bonus: 'Bonus (moved on a rest day)',
   missed: 'Missed',
   frozen: 'Saved by a freeze',
   rest: 'Rest day',
@@ -101,7 +102,7 @@ export default function CalendarScreen() {
         </Card>
 
         <View style={[styles.chips, { marginBottom: 16 }]}>
-          {(['done', 'frozen', 'missed', 'rest', 'pending'] as DayStatus[]).map((s) => (
+          {(['done', 'bonus', 'frozen', 'missed', 'rest', 'pending'] as DayStatus[]).map((s) => (
             <View key={s} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: STATUS_COLOR[s] }} />
               <Text style={styles.muted}>{STATUS_LABEL[s]}</Text>
@@ -121,7 +122,11 @@ export default function CalendarScreen() {
                 </Text>
                 <Text style={styles.muted}>
                   {STATUS_LABEL[day.status]}
-                  {day.goal ? ` · ${formatValue(day.goal, day.value)} achieved` : ''}
+                  {day.goal
+                    ? ` · ${formatValue(day.goal, day.value)} achieved`
+                    : day.value > 0
+                      ? ` · ${formatMinutes(day.value)} moved`
+                      : ''}
                 </Text>
               </>
             ) : (

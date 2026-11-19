@@ -51,6 +51,8 @@ export type Settings = {
   restDays: number[];
   /** How many ride metres count as one walk metre for distance goals. */
   rideFactor: number;
+  /** Distance goals (walk-equivalent) are never below this. */
+  minDistanceKm: number;
   maxHr: number;
   /** "HH:MM" local time. */
   morningReminder: string;
@@ -68,6 +70,7 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   restDays: [2, 5], // Tue, Fri
   rideFactor: 3,
+  minDistanceKm: 5,
   maxHr: 185,
   morningReminder: '08:00',
   eveningReminder: '19:30',
@@ -92,4 +95,5 @@ export type DayResult = {
   done: boolean;
 };
 
-export type DayStatus = 'done' | 'missed' | 'frozen' | 'rest' | 'pending' | 'none';
+/** `bonus`: a rest day on which you moved anyway; it counts like a done day. */
+export type DayStatus = 'done' | 'bonus' | 'missed' | 'frozen' | 'rest' | 'pending' | 'none';

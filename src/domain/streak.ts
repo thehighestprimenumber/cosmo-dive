@@ -16,7 +16,8 @@ export type StreakState = {
  * Replays every day from the start of the plan. Nothing here is stored:
  * streaks are always derived from goals + activities.
  *
- * - Rest days neither add to nor break the streak.
+ * - Rest days don't break the streak. Moving on one anyway (see
+ *   REST_BONUS_SECONDS) makes it a bonus day that counts like a done day.
  * - Every 7 completed days earns a freeze (max 2).
  * - A missed day uses a freeze if you have one; otherwise the streak resets.
  * - Today is never "missed" while it is still in progress.
@@ -30,10 +31,10 @@ export function computeStreak(days: DayResult[], today: DateKey): StreakState {
   let sinceEarn = 0;
 
   for (const day of sorted) {
-    if (!day.goal) {
+    if (!day.goal && !day.done) {
       statuses.set(day.date, 'rest');
     } else if (day.done) {
-      statuses.set(day.date, 'done');
+      statuses.set(day.date, day.goal ? 'done' : 'bonus');
       current++;
       longest = Math.max(longest, current);
       sinceEarn++;

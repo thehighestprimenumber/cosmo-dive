@@ -83,4 +83,41 @@ describe('refresh', () => {
     expect(snap.days.get('2026-11-02')?.status).toBe('pending');
     expect(snap.streak.current).toBe(0);
   });
+
+  it('replaces today\'s goal from older rules, unless it is already done', async () => {
+    const { insertGoal } = await import('../data/db');
+    const now = new Date(2026, 10, 10, 9, 0);
+    const oldGoal = {
+      date: '2026-11-10',
+      goal: { kind: 'distance' as const, meters: 2300, suggestedSport: 'walk' as const },
+      planVersion: 1,
+    };
+
+    // Not done yet → replaced by the current rules.
+    const db = fakeDb();
+    await migrate(db);
+    await insertGoal(db, oldGoal);
+    await refresh(db, sourceOf([]), { ...settings, startDate: '2026-11-10' }, { now });
+    const [replaced] = await loadGoals(db, '2026-11-10', '2026-11-10');
+    expect(replaced.planVersion).toBeGreaterThan(1);
+
+    // Already done → kept exactly as it was.
+    const db2 = fakeDb();
+    await migrate(db2);
+    await insertGoal(db2, oldGoal);
+    await refresh(db2, sourceOf([walk('2026-11-10', 60)]), { ...settings, startDate: '2026-11-10' }, { now });
+    const [kept] = await loadGoals(db2, '2026-11-10', '2026-11-10');
+    expect(kept).toEqual(oldGoal);
+  });
+
+  it('turns a rest day with a 20+ minute walk into a bonus day', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const restSettings = { ...settings, restDays: [2], startDate: '2026-11-09' }; // Tue 10 Nov is a rest day
+    const snap = await refresh(db, sourceOf([walk('2026-11-10', 25)]), restSettings, {
+      now: new Date(2026, 10, 10, 20, 0),
+    });
+    expect(snap.todayGoal).toBeNull();
+    expect(snap.days.get('2026-11-10')?.status).toBe('bonus');
+  });
 });

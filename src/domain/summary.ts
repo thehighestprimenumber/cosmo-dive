@@ -27,7 +27,8 @@ export function weekSummary(
       statuses.get(date) ?? (date > today ? (restDays.includes((i + 1) % 7) ? 'rest' : 'future') : 'none');
     return { date, status };
   });
-  const done = days.filter((d) => d.status === 'done').length;
+  // Bonus days (moved on a rest day) count as done, so a great week can beat its plan.
+  const done = days.filter((d) => d.status === 'done' || d.status === 'bonus').length;
   const planned = days.filter(
     (d) => d.date >= startDate && d.status !== 'rest' && d.status !== 'none',
   ).length;
