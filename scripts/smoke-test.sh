@@ -16,9 +16,18 @@ adb exec-out screencap -p > screenshot.png
 echo "===== crash / JS errors ====="
 grep -nE "FATAL EXCEPTION|AndroidRuntime|ReactNativeJS|Error:|Exception" logcat.txt | grep -v "W/System.err.*NoSuchFieldException" | head -120
 
-if adb shell pidof "$PKG" >/dev/null; then
-  echo "===== APP ALIVE ====="
+if ! adb shell pidof "$PKG" >/dev/null; then
+  echo "===== APP NOT RUNNING (crashed) ====="
+  exit 1
+fi
+echo "===== APP ALIVE ====="
+
+# The first screen (onboarding) must actually render, not just a blank window.
+adb shell uiautomator dump /sdcard/ui.xml >/dev/null && adb pull /sdcard/ui.xml ui.xml >/dev/null
+if grep -q "Daily Spark" ui.xml; then
+  echo "===== ONBOARDING RENDERED ====="
   exit 0
 fi
-echo "===== APP NOT RUNNING (crashed) ====="
+echo "===== APP RUNNING BUT ONBOARDING NOT FOUND ON SCREEN ====="
+grep -o 'text="[^"]*"' ui.xml | head -40
 exit 1

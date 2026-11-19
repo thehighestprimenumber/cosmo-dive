@@ -60,6 +60,8 @@ jobs:
 
       # Release build, signed with the project's fixed key (android/app/debug.keystore
       # from the template), so updates install over each other and keep your data.
+      # R8 minification is off (app.json): it stripped WorkManager's database class
+      # and crashed the app on launch.
       # arm64 for real phones, x86_64 so the emulator smoke test can run it.
       - name: Build APK
         working-directory: android
@@ -109,6 +111,7 @@ jobs:
           path: |
             logcat.txt
             screenshot.png
+            ui.xml
 
   publish:
     needs: [build, smoke-test]
