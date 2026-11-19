@@ -11,7 +11,6 @@ export const colors = {
   done: '#3DBE6E',
   missed: '#D9534F',
   frozen: '#5BB8E8',
-  bonus: '#A47CFF', // moved on a rest day
   rest: '#4B4440',
   pending: '#FFB547',
 };
@@ -21,7 +20,6 @@ export const gap = 16;
 
 export const STATUS_COLOR: Record<DayStatus | 'future', string> = {
   done: colors.done,
-  bonus: colors.bonus,
   missed: colors.missed,
   frozen: colors.frozen,
   rest: colors.rest,

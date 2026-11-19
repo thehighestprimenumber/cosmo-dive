@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatKm, formatMinutes, formatValue, goalEmoji, goalSubtitle, goalTitle } from '../../domain/format';
-import { REST_BONUS_SECONDS, restDayResult } from '../../domain/progress';
 import { weekSummary } from '../../domain/summary';
 import type { Activity } from '../../domain/types';
 import { useApp } from '../../state/AppState';
@@ -11,8 +10,7 @@ import { colors, STATUS_COLOR } from '../../ui/theme';
 
 export default function TodayScreen() {
   const { settings, snapshot, syncing, error, sourceStatus, refresh, connect } = useApp();
-  const restToday = snapshot && snapshot.todayGoal === null ? restDayResult(snapshot.todayActivities) : null;
-  const done = !!snapshot?.todayProgress?.done || !!restToday?.done;
+  const done = !!snapshot?.todayProgress?.done;
 
   // Pop the flame when today's goal flips to done.
   const [scale] = useState(() => new Animated.Value(1));
@@ -73,20 +71,8 @@ export default function TodayScreen() {
         {/* Today's goal */}
         {goal === null && (
           <Card>
-            <Text style={styles.h2}>{restToday?.done ? '💜 Bonus day!' : '😴 Rest day'}</Text>
-            <Text style={styles.muted}>
-              {restToday?.done
-                ? 'You moved on a rest day, so today counts toward your streak.'
-                : `Your streak is safe today. Move ${formatMinutes(REST_BONUS_SECONDS)} anyway and it counts as a bonus day.`}
-            </Text>
-            {restToday && (
-              <>
-                <ProgressBar fraction={Math.min(1, restToday.value / REST_BONUS_SECONDS)} done={restToday.done} />
-                <Text style={styles.body}>
-                  {formatMinutes(restToday.value)} of {formatMinutes(REST_BONUS_SECONDS)}
-                </Text>
-              </>
-            )}
+            <Text style={styles.h2}>😴 Rest day</Text>
+            <Text style={styles.muted}>From your old fixed schedule. Your streak is safe today.</Text>
           </Card>
         )}
         {goal && progress && (
@@ -102,6 +88,23 @@ export default function TodayScreen() {
                 ? `Goal complete! 🎉 ${formatValue(goal, progress.value)}`
                 : `${formatValue(goal, progress.value)} of ${formatValue(goal, progress.target)}`}
             </Text>
+            {!done && streak && (
+              <Text style={[styles.hint, { marginTop: 8 }]}>
+                {streak.restLeftThisWeek > 0
+                  ? `Not today? Skipping uses 1 of your ${streak.restLeftThisWeek} rest day${streak.restLeftThisWeek === 1 ? '' : 's'} left this week — no streak lost.`
+                  : 'No rest days left this week: skipping today costs a freeze or your streak.'}
+              </Text>
+            )}
+            {snapshot.todayNotes.length > 0 && (
+              <View style={{ marginTop: 12, gap: 2 }}>
+                <Text style={styles.label}>Why this goal</Text>
+                {snapshot.todayNotes.map((n) => (
+                  <Text key={n} style={styles.muted}>
+                    · {n}
+                  </Text>
+                ))}
+              </View>
+            )}
           </Card>
         )}
         {goal === undefined && !syncing && snapshot && (
@@ -113,7 +116,7 @@ export default function TodayScreen() {
         {/* This week */}
         {snapshot && (
           <WeekCard
-            summary={weekSummary(snapshot.streak.statuses, snapshot.today, settings.restDays, settings.startDate)}
+            summary={weekSummary(snapshot.streak.statuses, snapshot.today, settings.restDaysPerWeek, settings.startDate)}
             today={snapshot.today}
           />
         )}
@@ -145,7 +148,7 @@ function WeekCard({ summary, today }: { summary: ReturnType<typeof weekSummary>;
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <Text style={styles.label}>This week</Text>
         <Text style={styles.body}>
-          {summary.done}/{summary.planned} goals
+          {summary.done}/{summary.planned} goals · {summary.restUsed} rest
         </Text>
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>

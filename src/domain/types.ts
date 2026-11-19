@@ -39,20 +39,36 @@ export type GoalSpec =
 
 export type GoalKind = GoalSpec['kind'];
 
-/** Stored once per day and never rewritten. `goal: null` is a rest day. */
+/** Why a goal is what it is, stored with it. */
+export type GoalMeta = {
+  /**
+   * The progression level before day-specific tweaks (recovery week, a big
+   * day yesterday, readiness…), so those tweaks never compound.
+   */
+  base: number;
+  /** Human-readable reasons, shown under the goal. */
+  notes: string[];
+};
+
+/**
+ * Stored once per day and never rewritten (except today's, see sync.ts).
+ * `goal: null` only appears in history from v1–v2 plans, which had fixed rest days.
+ */
 export type DailyGoal = {
   date: DateKey;
   goal: GoalSpec | null;
   planVersion: number;
+  meta?: GoalMeta;
 };
 
 export type Settings = {
-  /** 0 = Sunday … 6 = Saturday. */
-  restDays: number[];
+  /**
+   * Rest days are flexible: any day you don't hit the goal uses one of these,
+   * per Monday–Sunday week. Only days beyond them break the streak.
+   */
+  restDaysPerWeek: number;
   /** How many ride metres count as one walk metre for distance goals. */
   rideFactor: number;
-  /** Distance goals (walk-equivalent) are never below this. */
-  minDistanceKm: number;
   maxHr: number;
   /** "HH:MM" local time. */
   morningReminder: string;
@@ -68,9 +84,8 @@ export type Settings = {
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
-  restDays: [2, 5], // Tue, Fri
+  restDaysPerWeek: 2,
   rideFactor: 3,
-  minDistanceKm: 5,
   maxHr: 185,
   morningReminder: '08:00',
   eveningReminder: '19:30',
@@ -93,7 +108,9 @@ export type DayResult = {
   goal: GoalSpec | null;
   value: number;
   done: boolean;
+  planVersion?: number;
+  meta?: GoalMeta;
 };
 
-/** `bonus`: a rest day on which you moved anyway; it counts like a done day. */
-export type DayStatus = 'done' | 'bonus' | 'missed' | 'frozen' | 'rest' | 'pending' | 'none';
+/** `rest`: a day without the goal met that used one of the week's flexible rest days. */
+export type DayStatus = 'done' | 'missed' | 'frozen' | 'rest' | 'pending' | 'none';

@@ -11,7 +11,7 @@ export type Backup = {
   app: 'daily-spark';
   version: 1;
   exportedAt: string;
-  settings: Pick<Settings, 'restDays' | 'rideFactor' | 'maxHr' | 'morningReminder' | 'eveningReminder' | 'startDate'>;
+  settings: Pick<Settings, 'restDaysPerWeek' | 'rideFactor' | 'maxHr' | 'morningReminder' | 'eveningReminder' | 'startDate'>;
   goals: DailyGoal[];
 };
 
@@ -22,7 +22,7 @@ export async function buildBackup(db: SQLiteDatabase, today: DateKey): Promise<B
     version: 1,
     exportedAt: new Date().toISOString(),
     settings: {
-      restDays: s.restDays,
+      restDaysPerWeek: s.restDaysPerWeek,
       rideFactor: s.rideFactor,
       maxHr: s.maxHr,
       morningReminder: s.morningReminder,
@@ -72,7 +72,10 @@ export async function restoreBackup(db: SQLiteDatabase, backup: Backup, today: D
   const startDate = current.onboarded && current.startDate < backup.settings.startDate
     ? current.startDate
     : backup.settings.startDate;
-  await saveSettings(db, { ...backup.settings, startDate });
+  // Backups from before flexible rest days stored fixed weekdays instead.
+  const { restDays, ...prefs } = backup.settings as Backup['settings'] & { restDays?: number[] };
+  if (prefs.restDaysPerWeek === undefined && Array.isArray(restDays)) prefs.restDaysPerWeek = restDays.length;
+  await saveSettings(db, { ...prefs, startDate });
   await clearResults(db);
   return after - before;
 }

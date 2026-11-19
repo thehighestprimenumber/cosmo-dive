@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { DEFAULT_SETTINGS, type DailyGoal, type DateKey, type DayResult, type GoalSpec, type Settings } from '../domain/types';
+import { DEFAULT_SETTINGS, type DailyGoal, type DateKey, type DayResult, type GoalMeta, type GoalSpec, type Settings } from '../domain/types';
 
 export const DB_NAME = 'daily-spark.db';
 
@@ -27,6 +27,8 @@ const MIGRATIONS: string[] = [
      key TEXT PRIMARY KEY NOT NULL,
      value TEXT NOT NULL
    );`,
+  // v2: why each goal is what it is (GoalMeta JSON).
+  `ALTER TABLE goals ADD COLUMN meta TEXT;`,
 ];
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {
@@ -45,8 +47,14 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
 
 export async function loadSettings(db: SQLiteDatabase, today: DateKey): Promise<Settings> {
   const rows = await db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM settings');
-  const stored = Object.fromEntries(rows.map((r) => [r.key, JSON.parse(r.value)]));
-  return { ...DEFAULT_SETTINGS, startDate: today, ...stored };
+  const stored: Record<string, unknown> = Object.fromEntries(rows.map((r) => [r.key, JSON.parse(r.value)]));
+  // Fixed rest days (plans v1–v2) became a number of flexible rest days per week.
+  if (stored.restDaysPerWeek === undefined && Array.isArray(stored.restDays)) {
+    stored.restDaysPerWeek = stored.restDays.length;
+  }
+  delete stored.restDays;
+  delete stored.minDistanceKm;
+  return { ...DEFAULT_SETTINGS, startDate: today, ...(stored as Partial<Settings>) };
 }
 
 export async function saveSettings(db: SQLiteDatabase, patch: Partial<Settings>): Promise<void> {
@@ -59,17 +67,18 @@ export async function saveSettings(db: SQLiteDatabase, patch: Partial<Settings>)
 
 // ---- goals ----
 
-type GoalRow = { date: string; spec: string | null; plan_version: number };
+type GoalRow = { date: string; spec: string | null; plan_version: number; meta: string | null };
 
 const toGoal = (r: GoalRow): DailyGoal => ({
   date: r.date,
   goal: r.spec ? (JSON.parse(r.spec) as GoalSpec) : null,
   planVersion: r.plan_version,
+  ...(r.meta ? { meta: JSON.parse(r.meta) as GoalMeta } : {}),
 });
 
 export async function loadGoals(db: SQLiteDatabase, from: DateKey, to: DateKey): Promise<DailyGoal[]> {
   const rows = await db.getAllAsync<GoalRow>(
-    'SELECT date, spec, plan_version FROM goals WHERE date >= ? AND date <= ? ORDER BY date',
+    'SELECT date, spec, plan_version, meta FROM goals WHERE date >= ? AND date <= ? ORDER BY date',
     from,
     to,
   );
@@ -84,11 +93,12 @@ export async function lastGoalDate(db: SQLiteDatabase): Promise<DateKey | null> 
 /** Goals are never overwritten: INSERT OR IGNORE keeps the original if one exists. */
 export async function insertGoal(db: SQLiteDatabase, g: DailyGoal): Promise<void> {
   await db.runAsync(
-    'INSERT OR IGNORE INTO goals (date, spec, plan_version, created_at) VALUES (?, ?, ?, ?)',
+    'INSERT OR IGNORE INTO goals (date, spec, plan_version, created_at, meta) VALUES (?, ?, ?, ?, ?)',
     g.date,
     g.goal ? JSON.stringify(g.goal) : null,
     g.planVersion,
     new Date().toISOString(),
+    g.meta ? JSON.stringify(g.meta) : null,
   );
 }
 

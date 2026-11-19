@@ -5,32 +5,30 @@ export type WeekSummary = {
   /** Monday … Sunday of the week containing `today`. */
   days: { date: DateKey; status: DayStatus | 'future' }[];
   done: number;
-  /** Training days this week (rest days excluded), including ones still to come. */
+  /** Days you're aiming to train this week: 7 minus your rest days. */
   planned: number;
+  restUsed: number;
 };
 
-/**
- * This week at a glance. Days without a stored goal yet are "future" (or
- * "none" before the plan started); `planned` counts them unless they fall
- * on a rest day.
- */
+/** This week at a glance. Days before the plan started show as "none". */
 export function weekSummary(
   statuses: Map<DateKey, DayStatus>,
   today: DateKey,
-  restDays: number[],
+  restDaysPerWeek: number,
   startDate: DateKey,
 ): WeekSummary {
   const monday = mondayOf(today);
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(monday, i);
     const status: DayStatus | 'future' =
-      statuses.get(date) ?? (date > today ? (restDays.includes((i + 1) % 7) ? 'rest' : 'future') : 'none');
+      date < startDate ? 'none' : (statuses.get(date) ?? (date > today ? 'future' : 'none'));
     return { date, status };
   });
-  // Bonus days (moved on a rest day) count as done, so a great week can beat its plan.
-  const done = days.filter((d) => d.status === 'done' || d.status === 'bonus').length;
-  const planned = days.filter(
-    (d) => d.date >= startDate && d.status !== 'rest' && d.status !== 'none',
-  ).length;
-  return { days, done, planned };
+  const inPlan = days.filter((d) => d.date >= startDate).length;
+  return {
+    days,
+    done: days.filter((d) => d.status === 'done').length,
+    planned: Math.max(0, Math.min(inPlan, 7 - restDaysPerWeek)),
+    restUsed: days.filter((d) => d.status === 'rest').length,
+  };
 }

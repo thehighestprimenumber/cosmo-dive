@@ -54,17 +54,6 @@ export async function notifyGoalComplete(settings: Settings, goal: GoalSpec, str
   });
 }
 
-/** Shown when the background sync sees you moved enough on a rest day. */
-export async function notifyBonusDay(streak: number): Promise<void> {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: `Bonus day! 💜 ${streak}-day streak`,
-      body: 'You moved on a rest day, so it counts toward your streak.',
-    },
-    trigger: { channelId: CHANNEL },
-  });
-}
-
 /**
  * One-off "save your streak" reminder for today. Scheduled whenever the app
  * syncs and today's goal isn't done yet; cancelled once it is.

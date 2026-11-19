@@ -80,23 +80,17 @@ export function Field({
   );
 }
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const DAY_INDEX = [1, 2, 3, 4, 5, 6, 0];
-
-/** Toggle chips for rest days. Values are 0 = Sunday … 6 = Saturday. */
-export function RestDayPicker({ value, onChange }: { value: number[]; onChange: (days: number[]) => void }) {
+/** Choose how many flexible rest days per week (0–3). */
+export function RestPerWeekPicker({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   return (
     <View style={styles.chips}>
-      {WEEKDAYS.map((name, i) => {
-        const day = DAY_INDEX[i];
-        const on = value.includes(day);
+      {[0, 1, 2, 3].map((n) => {
+        const on = value === n;
         return (
-          <Pressable
-            key={name}
-            onPress={() => onChange(on ? value.filter((d) => d !== day) : [...value, day].sort())}
-            style={[styles.chip, on && styles.chipOn]}
-          >
-            <Text style={[styles.chipText, on && { color: colors.text }]}>{name}</Text>
+          <Pressable key={n} onPress={() => onChange(n)} style={[styles.chip, on && styles.chipOn]}>
+            <Text style={[styles.chipText, on && { color: colors.text }]}>
+              {n === 0 ? 'None' : `${n} per week`}
+            </Text>
           </Pressable>
         );
       })}

@@ -10,15 +10,16 @@ Daily Spark reads the walks and rides your Galaxy Watch records (Samsung Health 
   - 📏 **Distance**: "Walk 5 km (or ride 15 km)". Rides count at 1/3 of their distance by default.
   - ⏱️ **Time**: "Move for 40 min". Walks and rides both count.
   - ❤️ **Heart rate zone**: "20 min in Zone 2". Only used once you have heart rate data.
-- **Rest days** (Tue and Fri by default) never break your streak. Move 20+ minutes on one anyway and it becomes a 💜 **bonus day** that counts toward your streak like any done day.
+- **Flexible rest days**: no fixed days. Every day has a goal, and you choose how many rest days you get per week (2 by default). Any day you don't hit the goal uses one of them, without breaking your streak. Train on a day you meant to rest and the rest day stays available for later that week. Only days beyond your rest days break the streak.
 - **Streak freezes**: you earn one 🧊 for every 7 days completed, up to 2. A missed day uses a freeze instead of resetting your streak.
 - **Progression**: there's no AI, just plain rules in [`src/domain/generator.ts`](src/domain/generator.ts):
-  - Your starting level is the median daily amount from the last 28 days, ignoring activities under 10 minutes (auto-detected errands).
-  - Distance goals are never below your **minimum distance** (5 km by default, in Settings).
+  - Your starting level is **your typical day**: the median over the last 90 days of the days you actually did that activity. For walking distance, that means your walking days, counting walks only (no rides, no activities under 15 minutes). **Settings → Diagnostics** shows these numbers.
   - Each goal type goes up at most +7% a week, when you've been hitting it.
-  - Missing two training days in a row eases the next goal by 15%.
-  - Every 4th week is a recovery week at 75%.
-  - Goals stay between 50% and 160% of what you actually do.
+  - Missing two training days in a row (beyond your rest days) eases the next goal by 15%.
+  - The day after a big effort (150%+ of the goal), the goal is 10% lighter.
+  - Every 4th week is a recovery week at 80%.
+  - Goals stay between 80% and 150% of your typical day.
+  - Each goal lists *why* it is what it is under **Why this goal**.
 - **Background sync**: about every 30 minutes (Android decides exactly when), the app reads Health Connect, notifies you once when today's goal is done, and keeps the evening reminder up to date.
 - **Backup**: **Settings → Export history** saves your goal history to a JSON file (e.g. to Google Drive). **Import history** merges it on a new phone and recalculates your streak.
 - **History**: each day's goal is saved once, in SQLite, and never changed. The one exception is today's goal: it's recalculated when you change settings or the rules change in an update, unless you've already completed it. Completion, streaks and the calendar are always *recalculated* from those goals plus Health Connect. If you edit or delete a workout, use **Settings → Rebuild history**.

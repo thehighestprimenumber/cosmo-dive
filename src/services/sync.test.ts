@@ -29,7 +29,7 @@ function sourceOf(acts: Activity[]): ActivitySource {
   };
 }
 
-const settings: Settings = { ...DEFAULT_SETTINGS, restDays: [], startDate: '2026-11-02', onboarded: true };
+const settings: Settings = { ...DEFAULT_SETTINGS, restDaysPerWeek: 2, startDate: '2026-11-02', onboarded: true };
 
 describe('refresh', () => {
   it('back-fills one goal per day, never rewrites them, and builds a streak', async () => {
@@ -52,11 +52,13 @@ describe('refresh', () => {
 
     // A second refresh with different rules must not change stored goals.
     const before = JSON.stringify(goals);
-    await refresh(db, sourceOf(acts), { ...settings, restDays: [0, 1, 2, 3, 4, 5, 6] }, { now });
+    await refresh(db, sourceOf(acts), { ...settings, restDaysPerWeek: 0, rideFactor: 9 }, { now });
     expect(JSON.stringify(await loadGoals(db, '2026-01-01', '2026-12-31'))).toBe(before);
   });
 
   it('re-checks history when activities change (e.g. a deleted workout)', async () => {
+    // No rest days, so the deleted workout's day is a miss.
+    const noRest = { ...settings, restDaysPerWeek: 0 };
     const db = fakeDb();
     await migrate(db);
     const acts = Array.from({ length: 41 }, (_, i) => {
@@ -64,10 +66,10 @@ describe('refresh', () => {
       return walk(d, d < '2026-11-01' ? 30 : 300);
     });
     const now = new Date(2026, 10, 10, 20, 0);
-    await refresh(db, sourceOf(acts), settings, { now });
+    await refresh(db, sourceOf(acts), noRest, { now });
 
     const without5th = acts.filter((a) => a.id !== '2026-11-05');
-    const snap = await refresh(db, sourceOf(without5th), settings, { now, fullRebuild: true });
+    const snap = await refresh(db, sourceOf(without5th), noRest, { now, fullRebuild: true });
     // 3 days done → 5th missed (no freeze yet) → 5 more done.
     expect(snap.days.get('2026-11-05')?.status).toBe('missed');
     expect(snap.streak.current).toBe(5);
@@ -110,14 +112,25 @@ describe('refresh', () => {
     expect(kept).toEqual(oldGoal);
   });
 
-  it('turns a rest day with a 20+ minute walk into a bonus day', async () => {
+  it('days without the goal use the week\'s flexible rest days before breaking the streak', async () => {
     const db = fakeDb();
     await migrate(db);
-    const restSettings = { ...settings, restDays: [2], startDate: '2026-11-09' }; // Tue 10 Nov is a rest day
-    const snap = await refresh(db, sourceOf([walk('2026-11-10', 25)]), restSettings, {
-      now: new Date(2026, 10, 10, 20, 0),
+    // Mon 9 – Fri 13 Nov: walk Mon, nothing Tue–Thu, walk Fri. Two rest days per week.
+    const acts = [walk('2026-11-09', 300), walk('2026-11-13', 300)];
+    const snap = await refresh(db, sourceOf(acts), { ...settings, startDate: '2026-11-09' }, {
+      now: new Date(2026, 10, 13, 20, 0),
     });
-    expect(snap.todayGoal).toBeNull();
-    expect(snap.days.get('2026-11-10')?.status).toBe('bonus');
+    expect(['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13'].map((d) => snap.days.get(d)?.status)).toEqual([
+      'done',
+      'rest',
+      'rest',
+      'missed',
+      'done',
+    ]);
+    expect(snap.streak.current).toBe(1);
+    expect(snap.streak.restLeftThisWeek).toBe(0);
+    // Every day got a real goal, with reasons attached.
+    const goals = await loadGoals(db, '2026-11-09', '2026-11-13');
+    expect(goals.every((g) => g.goal !== null && g.meta && g.meta.notes.length > 0)).toBe(true);
   });
 });

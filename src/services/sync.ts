@@ -1,8 +1,8 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { deleteGoal, insertGoal, lastGoalDate, loadGoals, loadResults, saveResults } from '../data/db';
 import { addDays, dateRange, endOfDay, startOfDay, toDateKey } from '../domain/dates';
-import { generateGoal, PLAN_VERSION } from '../domain/generator';
-import { activitiesOn, progressOf, restDayResult } from '../domain/progress';
+import { generateGoal, LOOKBACK_DAYS, PLAN_VERSION } from '../domain/generator';
+import { activitiesOn, progressOf } from '../domain/progress';
 import { computeStreak, type StreakState } from '../domain/streak';
 import type { Activity, DateKey, DayResult, DayStatus, GoalSpec, Progress, Settings } from '../domain/types';
 import type { ActivitySource } from '../sources/ActivitySource';
@@ -11,8 +11,6 @@ import type { ActivitySource } from '../sources/ActivitySource';
 const RECHECK_DAYS = 35;
 /** Never back-fill more than this many days of goals after a long break. */
 const BACKFILL_MAX_DAYS = 90;
-/** The generator looks back this far. */
-const LOOKBACK_DAYS = 28;
 
 export type DayView = {
   date: DateKey;
@@ -25,6 +23,8 @@ export type DayView = {
 export type Snapshot = {
   today: DateKey;
   todayGoal: GoalSpec | null | undefined;
+  /** Why today's goal is what it is. */
+  todayNotes: string[];
   todayProgress: Progress | null;
   todayActivities: Activity[];
   streak: StreakState;
@@ -59,13 +59,17 @@ export async function refresh(
   const last = await lastGoalDate(db);
   let generateFrom = maxKey(last ? addDays(last, 1) : start, maxKey(start, addDays(today, -BACKFILL_MAX_DAYS)));
 
-  const fetchFrom = addDays(minKey(recheckFrom, generateFrom), -LOOKBACK_DAYS);
+  const goals = new Map((await loadGoals(db, start, today)).map((g) => [g.date, g]));
+  const todays = goals.get(today);
+  const mayReplaceToday = !!todays && (opts.regenerateToday || todays.planVersion < PLAN_VERSION);
+
+  // Generating a goal needs LOOKBACK_DAYS of history; otherwise only the re-checked days.
+  const firstToGenerate = mayReplaceToday ? minKey(generateFrom, today) : generateFrom;
+  const fetchFrom =
+    firstToGenerate <= today ? addDays(minKey(recheckFrom, firstToGenerate), -LOOKBACK_DAYS) : recheckFrom;
   const activities = await source.getActivities(startOfDay(fetchFrom), endOfDay(today));
 
-  const goals = new Map((await loadGoals(db, start, today)).map((g) => [g.date, g]));
-
-  const todays = goals.get(today);
-  if (todays && (opts.regenerateToday || todays.planVersion < PLAN_VERSION)) {
+  if (todays && mayReplaceToday) {
     const doneAlready = todays.goal
       ? progressOf(todays.goal, activitiesOn(today, activities), settings).done
       : false;
@@ -83,7 +87,8 @@ export async function refresh(
   for (const date of start <= today ? dateRange(start, today) : []) {
     let daily = goals.get(date);
     if (!daily && date >= generateFrom) {
-      daily = generateGoal({ date, settings, activities, history });
+      const statuses = computeStreak(history, date, settings.restDaysPerWeek).statuses;
+      daily = generateGoal({ date, settings, activities, history, statuses });
       await insertGoal(db, daily);
       goals.set(date, daily);
     }
@@ -91,23 +96,26 @@ export async function refresh(
 
     if (date < recheckFrom) {
       const c = cached.get(date);
-      if (c) history.push({ date, goal: daily.goal, ...c });
+      if (c) history.push({ date, goal: daily.goal, planVersion: daily.planVersion, meta: daily.meta, ...c });
       continue;
     }
 
-    const result: DayResult = daily.goal
-      ? (() => {
-          const p = progressOf(daily.goal, activitiesOn(date, activities), settings);
-          return { date, goal: daily.goal, value: p.value, done: p.done };
-        })()
-      : { date, goal: null, ...restDayResult(activitiesOn(date, activities)) };
+    const p = daily.goal ? progressOf(daily.goal, activitiesOn(date, activities), settings) : null;
+    const result: DayResult = {
+      date,
+      goal: daily.goal,
+      value: p?.value ?? 0,
+      done: p?.done ?? false,
+      planVersion: daily.planVersion,
+      meta: daily.meta,
+    };
     history.push(result);
     recomputed.push(result);
   }
 
   await saveResults(db, recomputed);
 
-  const streak = computeStreak(history, today);
+  const streak = computeStreak(history, today, settings.restDaysPerWeek);
   const days = new Map<DateKey, DayView>(
     history.map((h) => [h.date, { ...h, status: streak.statuses.get(h.date) ?? 'none' }]),
   );
@@ -117,6 +125,7 @@ export async function refresh(
   return {
     today,
     todayGoal,
+    todayNotes: goals.get(today)?.meta?.notes ?? [],
     todayProgress: todayGoal ? progressOf(todayGoal, todayActivities, settings) : null,
     todayActivities,
     streak,

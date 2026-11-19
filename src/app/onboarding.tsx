@@ -7,14 +7,14 @@ import { DEFAULT_SETTINGS } from '../domain/types';
 import { estimateMaxHr } from '../domain/zones';
 import { setupNotifications } from '../services/notifications';
 import { useApp } from '../state/AppState';
-import { Button, Card, Field, Label, RestDayPicker, styles } from '../ui/components';
+import { Button, Card, Field, Label, RestPerWeekPicker, styles } from '../ui/components';
 import { colors } from '../ui/theme';
 
 export default function Onboarding() {
   const { connect, updateSettings, refresh, sourceStatus } = useApp();
   const [connected, setConnected] = useState<'health_connect' | 'demo' | null>(null);
   const [age, setAge] = useState('');
-  const [restDays, setRestDays] = useState(DEFAULT_SETTINGS.restDays);
+  const [restDaysPerWeek, setRestDaysPerWeek] = useState(DEFAULT_SETTINGS.restDaysPerWeek);
   const [busy, setBusy] = useState(false);
 
   const ageNum = Number(age);
@@ -34,7 +34,7 @@ export default function Onboarding() {
   const start = async () => {
     setBusy(true);
     await updateSettings({
-      restDays,
+      restDaysPerWeek,
       maxHr: estimateMaxHr(ageNum),
       startDate: toDateKey(new Date()),
       onboarded: true,
@@ -91,8 +91,11 @@ export default function Onboarding() {
 
         <Card>
           <Label>3 · Rest days</Label>
-          <Text style={[styles.muted, { marginBottom: 8 }]}>Rest days never break your streak.</Text>
-          <RestDayPicker value={restDays} onChange={setRestDays} />
+          <Text style={[styles.muted, { marginBottom: 8 }]}>
+            No fixed days: every day has a goal, and any day you skip uses one of your rest days for that week.
+            Rest days never break your streak.
+          </Text>
+          <RestPerWeekPicker value={restDaysPerWeek} onChange={setRestDaysPerWeek} />
         </Card>
 
         <Button title={busy ? 'Starting…' : 'Start my plan'} onPress={start} disabled={!connected || !validAge || busy} />

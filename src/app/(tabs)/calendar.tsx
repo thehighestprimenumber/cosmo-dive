@@ -10,10 +10,9 @@ import { colors, STATUS_COLOR } from '../../ui/theme';
 
 const STATUS_LABEL: Record<DayStatus, string> = {
   done: 'Done',
-  bonus: 'Bonus (moved on a rest day)',
   missed: 'Missed',
   frozen: 'Saved by a freeze',
-  rest: 'Rest day',
+  rest: 'Rest day (flexible)',
   pending: 'In progress',
   none: 'No goal',
 };
@@ -102,7 +101,7 @@ export default function CalendarScreen() {
         </Card>
 
         <View style={[styles.chips, { marginBottom: 16 }]}>
-          {(['done', 'bonus', 'frozen', 'missed', 'rest', 'pending'] as DayStatus[]).map((s) => (
+          {(['done', 'frozen', 'missed', 'rest', 'pending'] as DayStatus[]).map((s) => (
             <View key={s} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: STATUS_COLOR[s] }} />
               <Text style={styles.muted}>{STATUS_LABEL[s]}</Text>
