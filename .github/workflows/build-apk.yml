@@ -1,0 +1,85 @@
+name: Build APK
+
+# Every push builds an installable APK and publishes it as a GitHub release,
+# so the app can be installed straight from a phone: open the repo's
+# Releases page, tap the newest "Daily Spark build", download the .apk.
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx expo lint
+
+      - name: Unit tests
+        run: npm test
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      # Each build gets a higher versionCode so it installs over the previous one.
+      - name: Set version code
+        run: |
+          node -e '
+            const fs = require("fs");
+            const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
+            app.expo.android.versionCode = Number(process.env.GITHUB_RUN_NUMBER);
+            fs.writeFileSync("app.json", JSON.stringify(app, null, 2));
+          '
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+
+      # Release build, signed with the project's fixed key (android/app/debug.keystore
+      # from the template), so updates install over each other and keep your data.
+      # arm64 only: that's every modern Samsung phone, and it halves build time.
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk "daily-spark-${GITHUB_RUN_NUMBER}.apk"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: daily-spark-apk
+          path: daily-spark-*.apk
+          retention-days: 14
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${GITHUB_RUN_NUMBER}" "daily-spark-${GITHUB_RUN_NUMBER}.apk" \
+            --target "${GITHUB_SHA}" \
+            --prerelease \
+            --title "Daily Spark build ${GITHUB_RUN_NUMBER} (${GITHUB_REF_NAME})" \
+            --notes "Built from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA}. Download the .apk on your phone to install or update."

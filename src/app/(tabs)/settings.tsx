@@ -1,30 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Platform, ScrollView, Text } from 'react-native';
 import { openHealthConnectSettings } from 'react-native-health-connect';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { parseTime } from '../../domain/dates';
 import { zoneRange } from '../../domain/zones';
 import { useApp } from '../../state/AppState';
+import type { Settings } from '../../domain/types';
 import { Button, Card, Field, Label, RestDayPicker, styles } from '../../ui/components';
 
 export default function SettingsScreen() {
-  const { settings, updateSettings, refresh, connect, syncing } = useApp();
-  const [restDays, setRestDays] = useState<number[]>([]);
-  const [maxHr, setMaxHr] = useState('');
-  const [rideFactor, setRideFactor] = useState('');
-  const [morning, setMorning] = useState('');
-  const [evening, setEvening] = useState('');
-
-  useEffect(() => {
-    if (!settings) return;
-    setRestDays(settings.restDays);
-    setMaxHr(String(settings.maxHr));
-    setRideFactor(String(settings.rideFactor));
-    setMorning(settings.morningReminder);
-    setEvening(settings.eveningReminder);
-  }, [settings]);
-
+  const { settings } = useApp();
   if (!settings) return null;
+  // Remount the form whenever the saved settings change, so it starts from them.
+  return <SettingsForm key={JSON.stringify(settings)} settings={settings} />;
+}
+
+function SettingsForm({ settings }: { settings: Settings }) {
+  const { updateSettings, refresh, connect, syncing } = useApp();
+  const [restDays, setRestDays] = useState<number[]>(settings.restDays);
+  const [maxHr, setMaxHr] = useState(String(settings.maxHr));
+  const [rideFactor, setRideFactor] = useState(String(settings.rideFactor));
+  const [morning, setMorning] = useState(settings.morningReminder);
+  const [evening, setEvening] = useState(settings.eveningReminder);
 
   const save = async () => {
     const hr = Number(maxHr);

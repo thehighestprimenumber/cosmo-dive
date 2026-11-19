@@ -3,7 +3,9 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { useApp } from '../../state/AppState';
 import { colors } from '../../ui/theme';
 
-const icon = (emoji: string) => () => <Text style={{ fontSize: 20 }}>{emoji}</Text>;
+function TabIcon({ emoji }: { emoji: string }) {
+  return <Text style={{ fontSize: 20 }}>{emoji}</Text>;
+}
 
 export default function TabsLayout() {
   const { settings } = useApp();
@@ -27,9 +29,9 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: icon('🔥') }} />
-      <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: icon('📅') }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon('⚙️') }} />
+      <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: () => <TabIcon emoji="🔥" /> }} />
+      <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: () => <TabIcon emoji="📅" /> }} />
+      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: () => <TabIcon emoji="⚙️" /> }} />
     </Tabs>
   );
 }

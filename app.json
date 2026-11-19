@@ -22,14 +22,22 @@
         "android.permission.health.READ_HEART_RATE",
         "android.permission.health.READ_HEALTH_DATA_HISTORY"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 1
     },
     "plugins": [
       "expo-router",
       "expo-sqlite",
       "expo-notifications",
       "react-native-health-connect",
-      ["expo-build-properties", { "android": { "minSdkVersion": 26 } }]
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ]
     ]
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatKm, formatMinutes, formatValue, goalEmoji, goalSubtitle, goalTitle } from '../../domain/format';
@@ -12,7 +12,7 @@ export default function TodayScreen() {
   const done = !!snapshot?.todayProgress?.done;
 
   // Pop the flame when today's goal flips to done.
-  const scale = useRef(new Animated.Value(1)).current;
+  const [scale] = useState(() => new Animated.Value(1));
   const wasDone = useRef(done);
   useEffect(() => {
     if (done && !wasDone.current) {
@@ -48,7 +48,7 @@ export default function TodayScreen() {
 
         {sourceStatus && sourceStatus.state !== 'ready' && (
           <Card style={{ borderColor: colors.pending }}>
-            <Text style={styles.h2}>Can't read your activities</Text>
+            <Text style={styles.h2}>Can’t read your activities</Text>
             <Text style={styles.muted}>
               {sourceStatus.state === 'unavailable'
                 ? sourceStatus.reason
@@ -76,7 +76,7 @@ export default function TodayScreen() {
         )}
         {goal && progress && (
           <Card style={done ? { borderColor: colors.done } : undefined}>
-            <Text style={styles.label}>Today's goal</Text>
+            <Text style={styles.label}>Today’s goal</Text>
             <Text style={styles.h2}>
               {goalEmoji(goal)} {goalTitle(goal, settings)}
             </Text>
@@ -98,7 +98,7 @@ export default function TodayScreen() {
         {/* Today's activities */}
         {snapshot && snapshot.todayActivities.length > 0 && (
           <Card>
-            <Text style={styles.label}>Today's activities</Text>
+            <Text style={styles.label}>Today’s activities</Text>
             {snapshot.todayActivities.map((a) => (
               <ActivityRow key={a.id} a={a} />
             ))}
