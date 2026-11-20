@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { deleteGoal, insertGoal, lastGoalDate, loadGoals, loadResults, saveResults, saveSettings } from '../data/db';
-import { dailyAverageKm } from '../domain/aim';
+import { aimSuggestion, dailyAverageKm } from '../domain/aim';
 import {
   aimMonthTarget,
   earnedAchievements,
@@ -44,7 +44,7 @@ export type Snapshot = {
   usualTime: TimeOfDay | null;
   todayBoss: boolean;
   /** Your aim (km/day on average) and your actual average over the last 14 days. */
-  aim: { km: number; averageKm: number } | null;
+  aim: { km: number; averageKm: number; suggestion: number | null } | null;
   game: {
     xp: number;
     level: number;
@@ -180,7 +180,9 @@ export async function refresh(
   if (target !== settings.monthTargets[month]) {
     settingsPatch.monthTargets = { ...settings.monthTargets, [month]: target };
   }
+  const avg14 = dailyAverageKm(activities, today, settings.rideFactor);
   const earned = earnedAchievements({
+    aimReached: !!settings.dailyTargetKm && avg14 >= settings.dailyTargetKm,
     days: history,
     statuses: streak.statuses,
     longestStreak: streak.longest,
@@ -215,7 +217,11 @@ export async function refresh(
     },
     todayBoss: !!goals.get(today)?.meta?.boss,
     aim: settings.dailyTargetKm
-      ? { km: settings.dailyTargetKm, averageKm: dailyAverageKm(activities, today, settings.rideFactor) }
+      ? {
+          km: settings.dailyTargetKm,
+          averageKm: avg14,
+          suggestion: aimSuggestion(settings.dailyTargetKm, avg14, today, settings.aimSnoozedUntil),
+        }
       : null,
     today,
     todayGoal,

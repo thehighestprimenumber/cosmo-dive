@@ -117,7 +117,8 @@ export type AchievementId =
   | 'comeback'
   | 'month_champion'
   | 'century'
-  | 'level_5';
+  | 'level_5'
+  | 'aim_reached';
 
 export const ACHIEVEMENTS: { id: AchievementId; emoji: string; title: string; description: string }[] = [
   { id: 'first_goal', emoji: '✨', title: 'First spark', description: 'Complete your first goal.' },
@@ -132,6 +133,7 @@ export const ACHIEVEMENTS: { id: AchievementId; emoji: string; title: string; de
   { id: 'month_champion', emoji: '🏅', title: 'Monthly champion', description: 'Complete a monthly km challenge.' },
   { id: 'century', emoji: '💯', title: 'Century', description: 'Cover 100 km (walking equivalent) in a month.' },
   { id: 'level_5', emoji: '⭐', title: 'Level 5', description: 'Reach level 5.' },
+  { id: 'aim_reached', emoji: '🎯', title: 'On target', description: 'Average your daily km aim over two weeks.' },
 ];
 
 export type GameInput = {
@@ -142,6 +144,8 @@ export type GameInput = {
   level: number;
   monthKm: number;
   monthTarget: number;
+  /** Your 14-day average has reached your aim. */
+  aimReached?: boolean;
 };
 
 /** Which achievements your data currently satisfies. Unlocks are stored, so they never disappear. */
@@ -165,5 +169,6 @@ export function earnedAchievements(g: GameInput): AchievementId[] {
   if (g.monthKm >= g.monthTarget) out.push('month_champion');
   if (g.monthKm >= 100) out.push('century');
   if (g.level >= 5) out.push('level_5');
+  if (g.aimReached) out.push('aim_reached');
   return out;
 }

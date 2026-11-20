@@ -109,6 +109,12 @@ describe('achievements', () => {
     expect(got).not.toContain('streak_30');
   });
 
+  it('on target when your average reaches your aim', () => {
+    const statuses = new Map<string, DayStatus>();
+    expect(earnedAchievements({ ...base, days: [], statuses, aimReached: true })).toContain('aim_reached');
+    expect(earnedAchievements({ ...base, days: [], statuses })).not.toContain('aim_reached');
+  });
+
   it('all-rounder needs three goal types in one week', () => {
     const kinds = [
       { kind: 'distance' as const, meters: 5000, suggestedSport: 'walk' as const },

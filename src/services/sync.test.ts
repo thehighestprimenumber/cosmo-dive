@@ -184,7 +184,22 @@ describe('refresh', () => {
     const withAim = { ...s, dailyTargetKm: 5 };
     const snap = await refresh(db, sourceOf([]), withAim, { now });
     expect(snap.game.monthTarget).toBe(150);
-    expect(snap.aim).toEqual({ km: 5, averageKm: 0 });
+    expect(snap.aim).toEqual({ km: 5, averageKm: 0, suggestion: null });
+  });
+
+  it('offers to raise the aim once your 14-day average reaches it', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const now = new Date(2026, 10, 20, 20, 0);
+    // 14 days × 6 km = 6 km/day on average, aim 5.
+    const acts = Array.from({ length: 14 }, (_, i) => ({ ...walk(addDays('2026-11-20', -i), 70), distanceM: 6000 }));
+    const s = { ...settings, startDate: '2026-11-07', dailyTargetKm: 5 };
+    const snap = await refresh(db, sourceOf(acts), s, { now });
+    expect(snap.aim).toMatchObject({ km: 5, suggestion: 5.5 });
+    expect(snap.aim!.averageKm).toBeCloseTo(6);
+    expect(snap.game.newlyUnlocked).toContain('aim_reached');
+    const snoozed = await refresh(db, sourceOf(acts), { ...s, aimSnoozedUntil: '2026-11-27' }, { now });
+    expect(snoozed.aim?.suggestion).toBeNull();
   });
 });
 

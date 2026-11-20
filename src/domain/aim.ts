@@ -50,3 +50,23 @@ export function dailyAverageKm(activities: Activity[], today: DateKey, rideFacto
     .reduce((s, a) => s + walkEquivalentMeters(a, rideFactor), 0);
   return meters / 1000 / days;
 }
+
+/** The aim we suggest once you've reached yours: +10%, rounded to 0.5 km, at least +0.5 km. */
+export function nextAim(km: number): number {
+  return Math.max(km + 0.5, Math.round(km * 1.1 * 2) / 2);
+}
+
+/**
+ * Offer to raise the aim when your 14-day average has reached it, unless you
+ * said "not now" (snoozed until a date).
+ */
+export function aimSuggestion(
+  aimKm: number | null,
+  averageKm: number,
+  today: DateKey,
+  snoozedUntil: DateKey | null,
+): number | null {
+  if (!aimKm || averageKm < aimKm) return null;
+  if (snoozedUntil && today < snoozedUntil) return null;
+  return nextAim(aimKm);
+}

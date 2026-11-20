@@ -55,6 +55,17 @@ export async function notifyGoalComplete(settings: Settings, goal: GoalSpec, str
   });
 }
 
+/** Your 14-day average reached your aim. */
+export async function notifyAimReached(averageKm: number, suggestion: number): Promise<void> {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: `🎯 Aim reached: ${averageKm.toFixed(1)} km a day!`,
+      body: `Open Daily Spark to raise your aim to ${suggestion} km.`,
+    },
+    trigger: { channelId: CHANNEL },
+  });
+}
+
 /** New achievements unlocked by a background sync. */
 export async function notifyAchievements(titles: string[]): Promise<void> {
   if (!titles.length) return;

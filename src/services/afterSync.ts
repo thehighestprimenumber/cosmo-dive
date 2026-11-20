@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { saveSettings } from '../data/db';
 import type { Settings } from '../domain/types';
 import { ACHIEVEMENTS } from '../domain/game';
-import { notifyAchievements, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
+import { notifyAchievements, notifyAimReached, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
 import type { Snapshot } from './sync';
 
 /**
@@ -17,6 +17,11 @@ export async function afterSync(
   { inBackground }: { inBackground: boolean },
 ): Promise<void> {
   const done = !!snap.todayProgress?.done;
+  // You reached your aim: offer to raise it, once per aim.
+  if (inBackground && snap.aim?.suggestion && settings.aimNotifiedKm !== snap.aim.km) {
+    await notifyAimReached(snap.aim.averageKm, snap.aim.suggestion);
+    await saveSettings(db, { aimNotifiedKm: snap.aim.km });
+  }
   if (inBackground && snap.game.newlyUnlocked.length) {
     const titles = snap.game.newlyUnlocked.map((id) => ACHIEVEMENTS.find((a) => a.id === id)?.title ?? id);
     await notifyAchievements(titles);

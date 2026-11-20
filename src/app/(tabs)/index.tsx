@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatKm, formatMinutes, formatValue, goalEmoji, goalSubtitle, goalTitle } from '../../domain/format';
 import { weekSummary } from '../../domain/summary';
 import type { Activity, GoalKind } from '../../domain/types';
+import { addDays } from '../../domain/dates';
 import { ACHIEVEMENTS } from '../../domain/game';
 import { sourceFor } from '../../sources';
 import { useApp } from '../../state/AppState';
@@ -12,7 +13,7 @@ import { Button, Card, ProgressBar, styles } from '../../ui/components';
 import { colors, STATUS_COLOR } from '../../ui/theme';
 
 export default function TodayScreen() {
-  const { settings, snapshot, syncing, error, sourceStatus, refresh, connect } = useApp();
+  const { settings, snapshot, syncing, error, sourceStatus, refresh, connect, updateSettings } = useApp();
   const done = !!snapshot?.todayProgress?.done;
   const game = snapshot?.game;
   const unlockedToday = game
@@ -208,6 +209,29 @@ export default function TodayScreen() {
               done={snapshot.aim.averageKm >= snapshot.aim.km}
             />
             <Text style={styles.hint}>Your average over the last 14 days, counting every day.</Text>
+            {snapshot.aim.suggestion && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.h2}>
+                  🎉 You’re averaging {snapshot.aim.averageKm.toFixed(1)} km a day. Raise your aim to{' '}
+                  {snapshot.aim.suggestion} km?
+                </Text>
+                <Button
+                  title={`Raise to ${snapshot.aim.suggestion} km`}
+                  onPress={async () => {
+                    await updateSettings({ dailyTargetKm: snapshot.aim!.suggestion });
+                    await refresh({ regenerateToday: true });
+                  }}
+                />
+                <Button
+                  title="Not now"
+                  variant="secondary"
+                  onPress={async () => {
+                    await updateSettings({ aimSnoozedUntil: addDays(snapshot.today, 7) });
+                    await refresh();
+                  }}
+                />
+              </View>
+            )}
           </Card>
         )}
 

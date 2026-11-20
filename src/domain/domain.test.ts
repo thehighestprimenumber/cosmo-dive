@@ -437,3 +437,21 @@ describe('aim: average km per day', () => {
     expect(dailyAverageKm(acts, '2026-11-19', 3)).toBe(1);
   });
 });
+
+describe('raising the aim', () => {
+  it('suggests +10% rounded to 0.5 km, at least +0.5 km', async () => {
+    const { nextAim } = await import('./aim');
+    expect(nextAim(5)).toBe(5.5);
+    expect(nextAim(7)).toBe(7.5);
+    expect(nextAim(10)).toBe(11);
+  });
+
+  it('only once you average your aim, and not while snoozed', async () => {
+    const { aimSuggestion } = await import('./aim');
+    expect(aimSuggestion(5, 4.9, '2026-11-20', null)).toBeNull();
+    expect(aimSuggestion(5, 5.1, '2026-11-20', null)).toBe(5.5);
+    expect(aimSuggestion(5, 5.1, '2026-11-20', '2026-11-27')).toBeNull();
+    expect(aimSuggestion(5, 5.1, '2026-11-27', '2026-11-27')).toBe(5.5);
+    expect(aimSuggestion(null, 9, '2026-11-20', null)).toBeNull();
+  });
+});

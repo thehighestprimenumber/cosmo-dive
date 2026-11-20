@@ -91,6 +91,10 @@ export type Settings = {
    * Goals step up toward it; the monthly challenge is at least aim × days.
    */
   dailyTargetKm: number | null;
+  /** "Not now" on raising the aim: don't ask again before this date. */
+  aimSnoozedUntil: DateKey | null;
+  /** The aim we already sent a "you reached it" notification for. */
+  aimNotifiedKm: number | null;
   maxHr: number;
   /** "HH:MM" local time. */
   morningReminder: string;
@@ -115,6 +119,8 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   restDaysPerWeek: 2,
   rideFactor: 3,
   dailyTargetKm: null,
+  aimSnoozedUntil: null,
+  aimNotifiedKm: null,
   maxHr: 185,
   morningReminder: '08:00',
   eveningReminder: '19:30',
