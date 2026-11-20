@@ -1,9 +1,10 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState as RNAppState } from 'react-native';
-import { loadSettings, saveSettings } from '../data/db';
+import { loadSettings, loadWeekPlan, saveSettings, saveWeekPlan } from '../data/db';
+import { moveSession } from '../domain/plan';
 import { toDateKey } from '../domain/dates';
-import type { GoalKind, Settings } from '../domain/types';
+import type { DateKey, KeySessionKind, RegularKind, Settings } from '../domain/types';
 import { scheduleMorning, setupNotifications } from '../services/notifications';
 import { refresh as runRefresh, type Snapshot } from '../services/sync';
 import { afterSync } from '../services/afterSync';
@@ -17,8 +18,10 @@ type Ctx = {
   sourceStatus: SourceStatus | null;
   syncing: boolean;
   error: string | null;
-  refresh: (opts?: { fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: GoalKind }) => Promise<void>;
+  refresh: (opts?: { fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: RegularKind }) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
+  /** Move a key session to another free day of its week, then re-sync. */
+  moveKeySession: (week: DateKey, kind: KeySessionKind, to: DateKey) => Promise<void>;
   /** Re-reads settings from the database (e.g. after an import) and rebuilds history. */
   reloadAll: () => Promise<void>;
   /** Asks for data source permission; returns true when ready. */
@@ -35,10 +38,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const settingsRef = useRef<Settings | null>(null);
+  const snapshotRef = useRef<Snapshot | null>(null);
   const inFlight = useRef<Promise<void> | null>(null);
 
   const doRefresh = useCallback(
-    async (opts: { fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: GoalKind } = {}) => {
+    async (opts: { fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: RegularKind } = {}) => {
       const s = settingsRef.current;
       if (!s?.onboarded) return;
       if (inFlight.current) return inFlight.current;
@@ -52,6 +56,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           if (status.state !== 'ready') return;
           const snap = await runRefresh(db, source, s, opts);
           setSnapshot(snap);
+          snapshotRef.current = snap;
           await afterSync(db, s, snap, { inBackground: false }).catch(() => {});
           await registerBackgroundSync().catch(() => {});
         } catch (e) {
@@ -103,6 +108,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [updateSettings],
   );
 
+  const moveKeySession = useCallback(
+    async (week: DateKey, kind: KeySessionKind, to: DateKey) => {
+      const plan = await loadWeekPlan(db, week);
+      if (!plan) return;
+      const today = toDateKey(new Date());
+      const todayDone = !!snapshotRef.current?.todayProgress?.done;
+      const next = moveSession(plan, kind, to, today, todayDone);
+      if (next === plan) return;
+      await saveWeekPlan(db, next);
+      // If today's goal no longer matches the plan, sync replaces it (unless already done).
+      await doRefresh();
+    },
+    [db, doRefresh],
+  );
+
   const reloadAll = useCallback(async () => {
     const s = await loadSettings(db, toDateKey(new Date()));
     settingsRef.current = s;
@@ -133,7 +153,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppStateContext.Provider
-      value={{ settings, snapshot, sourceStatus, syncing, error, refresh: doRefresh, updateSettings, reloadAll, connect }}
+      value={{
+        settings,
+        snapshot,
+        sourceStatus,
+        syncing,
+        error,
+        refresh: doRefresh,
+        updateSettings,
+        moveKeySession,
+        reloadAll,
+        connect,
+      }}
     >
       {children}
     </AppStateContext.Provider>

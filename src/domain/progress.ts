@@ -11,6 +11,8 @@ export function walkEquivalentMeters(a: Activity, rideFactor: number): number {
 export function goalTarget(goal: GoalSpec): number {
   switch (goal.kind) {
     case 'distance':
+    case 'long_walk':
+    case 'brisk_walk':
       return goal.meters;
     case 'duration':
     case 'hr_zone':
@@ -31,6 +33,14 @@ export function measure(
       return activities.reduce((s, a) => s + a.durationS, 0);
     case 'hr_zone':
       return activities.reduce((s, a) => s + secondsInZone(a.hr, goal.zone, settings.maxHr), 0);
+    case 'long_walk':
+      // One outing, not several added up.
+      return Math.max(0, ...activities.filter((a) => a.sport === 'walk').map((a) => a.distanceM ?? 0));
+    case 'brisk_walk':
+      return activities
+        .filter((a) => a.sport === 'walk' && (a.distanceM ?? 0) >= 1000)
+        .filter((a) => a.durationS / (a.distanceM! / 1000) <= goal.paceSPerKm)
+        .reduce((s, a) => s + a.distanceM!, 0);
   }
 }
 

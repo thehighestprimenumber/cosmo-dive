@@ -30,6 +30,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: () => <TabIcon emoji="🔥" /> }} />
+      <Tabs.Screen name="week" options={{ title: 'Week', tabBarIcon: () => <TabIcon emoji="🗓️" /> }} />
       <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: () => <TabIcon emoji="📅" /> }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: () => <TabIcon emoji="⚙️" /> }} />
     </Tabs>

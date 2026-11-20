@@ -28,6 +28,11 @@ $UI wait "day streak" 40
 alive "starting the plan"
 $UI shot 03-today
 
+$UI tap "Week"
+$UI wait "This week"
+alive "opening Week"
+$UI shot 04a-week
+
 $UI tap "Calendar"
 $UI wait "Saved by a freeze"
 alive "opening Calendar"

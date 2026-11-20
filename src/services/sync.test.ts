@@ -153,7 +153,7 @@ describe('refresh', () => {
     nights = [...usual, { date, sleepS: 4 * 3600, lowHr: 55 }];
     const later = await refresh(db, source, s, { now: new Date(2026, 10, 19, 9, 0) });
     expect(later.todayReadiness).toBe('low');
-    const t = (g: typeof before) => (g!.kind === 'distance' ? g!.meters : (g as { seconds: number }).seconds);
+    const t = (g: typeof before) => ('meters' in g! ? g!.meters : g!.seconds);
     expect(t(later.todayGoal!)).toBeLessThan(t(before));
     expect(later.todayNotes.join(' ')).toContain('Short night');
   });
@@ -200,6 +200,74 @@ describe('refresh', () => {
     expect(snap.game.newlyUnlocked).toContain('aim_reached');
     const snoozed = await refresh(db, sourceOf(acts), { ...s, aimSnoozedUntil: '2026-11-27' }, { now });
     expect(snoozed.aim?.suggestion).toBeNull();
+  });
+
+  describe('weekly plan', () => {
+    const MON = '2026-11-23';
+    const s = { ...settings, startDate: '2026-11-16' };
+    const plan = (longDay: string, briskDay: string) => ({
+      week: MON,
+      sessions: [
+        { kind: 'long_walk' as const, day: longDay, plannedDay: longDay },
+        { kind: 'brisk_walk' as const, day: briskDay, plannedDay: briskDay },
+      ],
+    });
+    const at = (day: string, hour: number) => {
+      const d = startOfDay(day);
+      d.setHours(hour);
+      return d;
+    };
+
+    it('makes the key session the goal on its day', async () => {
+      const { saveWeekPlan } = await import('../data/db');
+      const db = fakeDb();
+      await migrate(db);
+      await saveWeekPlan(db, plan(addDays(MON, 5), addDays(MON, 2)));
+      const snap = await refresh(db, sourceOf([]), s, { now: at(addDays(MON, 2), 9) });
+      expect(snap.todayGoal?.kind).toBe('brisk_walk');
+      expect(snap.previews[addDays(MON, 5)]?.kind).toBe('long_walk');
+    });
+
+    it('a missed brisk walk moves to today; picking another goal type moves it on again', async () => {
+      const { saveWeekPlan } = await import('../data/db');
+      const db = fakeDb();
+      await migrate(db);
+      await saveWeekPlan(db, plan(addDays(MON, 5), addDays(MON, 2)));
+      await refresh(db, sourceOf([]), s, { now: at(addDays(MON, 2), 9) }); // Wednesday: brisk, not done
+      const thu = await refresh(db, sourceOf([]), s, { now: at(addDays(MON, 3), 9) });
+      expect(thu.todayGoal?.kind).toBe('brisk_walk');
+      expect(thu.forwarded.map((x) => x.kind)).toEqual(['brisk_walk']);
+
+      const switched = await refresh(db, sourceOf([]), s, {
+        now: at(addDays(MON, 3), 10),
+        regenerateToday: true,
+        todayKind: 'duration',
+      });
+      expect(switched.todayGoal?.kind).toBe('duration');
+      expect(switched.plan.sessions.find((x) => x.kind === 'brisk_walk')?.day).toBe(addDays(MON, 4));
+    });
+
+    it('moving a key session onto today replaces today\'s goal', async () => {
+      const { saveWeekPlan } = await import('../data/db');
+      const db = fakeDb();
+      await migrate(db);
+      await saveWeekPlan(db, plan(addDays(MON, 5), addDays(MON, 2)));
+      const mon = await refresh(db, sourceOf([]), s, { now: at(MON, 9) });
+      expect(mon.todayGoal?.kind).not.toBe('long_walk');
+      await saveWeekPlan(db, plan(MON, addDays(MON, 2)));
+      const after = await refresh(db, sourceOf([]), s, { now: at(MON, 10), regenerateToday: true });
+      expect(after.todayGoal?.kind).toBe('long_walk');
+    });
+
+    it('next week\'s plan appears on Sunday evening', async () => {
+      const db = fakeDb();
+      await migrate(db);
+      const sun = addDays(MON, 6);
+      expect((await refresh(db, sourceOf([]), s, { now: at(sun, 12) })).nextPlan).toBeNull();
+      const evening = await refresh(db, sourceOf([]), s, { now: at(sun, 19) });
+      expect(evening.nextPlan?.week).toBe(addDays(MON, 7));
+      expect(evening.nextPlan?.sessions.map((x) => x.kind)).toEqual(['long_walk', 'brisk_walk']);
+    });
   });
 });
 

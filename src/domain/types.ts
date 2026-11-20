@@ -45,9 +45,18 @@ export type GoalSpec =
   /** Distance in walk-equivalent metres (ride metres are divided by the ride factor). */
   | { kind: 'distance'; meters: number; suggestedSport: DistanceSport }
   | { kind: 'duration'; seconds: number }
-  | { kind: 'hr_zone'; zone: HrZone; seconds: number };
+  | { kind: 'hr_zone'; zone: HrZone; seconds: number }
+  /** Key session: one walk (or hike/run) of at least this distance. */
+  | { kind: 'long_walk'; meters: number }
+  /** Key session: walking distance at this pace or faster (seconds per km). */
+  | { kind: 'brisk_walk'; meters: number; paceSPerKm: number };
 
 export type GoalKind = GoalSpec['kind'];
+/** The everyday goal types (any sport for time and heart rate). */
+export type RegularKind = 'distance' | 'duration' | 'hr_zone';
+/** The weekly plan's key sessions. */
+export type KeySessionKind = 'long_walk' | 'brisk_walk';
+export type RegularGoalSpec = Extract<GoalSpec, { kind: RegularKind }>;
 
 /** Why a goal is what it is, stored with it. */
 export type GoalMeta = {
@@ -65,7 +74,12 @@ export type GoalMeta = {
   readiness?: 'low' | 'normal' | 'high' | 'unknown';
   /** A weekly boss day: harder, worth more XP. */
   boss?: boolean;
+  /** Brisk walk: the pace level (s/km) before today-only tweaks. */
+  pace?: number;
 };
+
+/** A dated goal the long walk builds toward, e.g. a 15 km hike on 31 Dec. */
+export type GoalEvent = { name: string; km: number; date: DateKey };
 
 /**
  * Stored once per day and never rewritten (except today's, see sync.ts).
@@ -91,6 +105,8 @@ export type Settings = {
    * Goals step up toward it; the monthly challenge is at least aim × days.
    */
   dailyTargetKm: number | null;
+  /** Optional dated goal; the weekly long walk ramps toward it. */
+  event: GoalEvent | null;
   /** "Not now" on raising the aim: don't ask again before this date. */
   aimSnoozedUntil: DateKey | null;
   /** The aim we already sent a "you reached it" notification for. */
@@ -119,6 +135,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   restDaysPerWeek: 2,
   rideFactor: 3,
   dailyTargetKm: null,
+  event: null,
   aimSnoozedUntil: null,
   aimNotifiedKm: null,
   maxHr: 185,

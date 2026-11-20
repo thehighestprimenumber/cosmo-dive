@@ -7,7 +7,7 @@ import { addDays, startOfDay, toDateKey } from '../domain/dates';
 import { formatKm, formatMinutes } from '../domain/format';
 import { baselineFor, LOOKBACK_DAYS } from '../domain/generator';
 import type { Night } from '../domain/readiness';
-import type { Activity, GoalSpec, Settings } from '../domain/types';
+import type { Activity, RegularGoalSpec, Settings } from '../domain/types';
 import { backgroundSyncStatus } from '../services/backgroundSync';
 import { sourceFor } from '../sources';
 import type { SourceStatus } from '../sources/ActivitySource';
@@ -68,7 +68,7 @@ async function buildReport(db: SQLiteDatabase): Promise<Report> {
       // The same "typical day" numbers the goal generator uses.
       const lookbackFrom = startOfDay(addDays(toDateKey(to), -LOOKBACK_DAYS));
       const recent = await source.getActivities(lookbackFrom, to);
-      const specs: GoalSpec[] = [
+      const specs: RegularGoalSpec[] = [
         { kind: 'distance', meters: 0, suggestedSport: 'walk' },
         { kind: 'duration', seconds: 0 },
         { kind: 'hr_zone', zone: 2, seconds: 0 },

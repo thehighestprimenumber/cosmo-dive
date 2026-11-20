@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import type { WeekPlan } from '../domain/plan';
 import { DEFAULT_SETTINGS, type DailyGoal, type DateKey, type DayResult, type GoalMeta, type GoalSpec, type Settings } from '../domain/types';
 
 export const DB_NAME = 'daily-spark.db';
@@ -29,6 +30,12 @@ const MIGRATIONS: string[] = [
    );`,
   // v2: why each goal is what it is (GoalMeta JSON).
   `ALTER TABLE goals ADD COLUMN meta TEXT;`,
+  // v3: weekly plans (which day each key session is on).
+  `CREATE TABLE week_plans (
+     week TEXT PRIMARY KEY NOT NULL,
+     data TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   );`,
 ];
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {
@@ -143,4 +150,20 @@ export async function saveResults(db: SQLiteDatabase, results: DayResult[]): Pro
 
 export async function clearResults(db: SQLiteDatabase): Promise<void> {
   await db.runAsync('DELETE FROM day_results');
+}
+
+// ---- weekly plans ----
+
+export async function loadWeekPlan(db: SQLiteDatabase, week: DateKey): Promise<WeekPlan | null> {
+  const row = await db.getFirstAsync<{ data: string }>('SELECT data FROM week_plans WHERE week = ?', week);
+  return row ? (JSON.parse(row.data) as WeekPlan) : null;
+}
+
+export async function saveWeekPlan(db: SQLiteDatabase, plan: WeekPlan): Promise<void> {
+  await db.runAsync(
+    'INSERT OR REPLACE INTO week_plans (week, data, updated_at) VALUES (?, ?, ?)',
+    plan.week,
+    JSON.stringify(plan),
+    new Date().toISOString(),
+  );
 }

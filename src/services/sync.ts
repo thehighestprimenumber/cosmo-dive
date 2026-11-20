@@ -1,5 +1,26 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { deleteGoal, insertGoal, lastGoalDate, loadGoals, loadResults, saveResults, saveSettings } from '../data/db';
+import {
+  deleteGoal,
+  insertGoal,
+  lastGoalDate,
+  loadGoals,
+  loadResults,
+  loadWeekPlan,
+  saveResults,
+  saveSettings,
+  saveWeekPlan,
+} from '../data/db';
+import {
+  forwardMissed,
+  freeDays,
+  moveSession,
+  nextWeekVisible,
+  planWeek,
+  sessionOn,
+  type KeySession,
+  type WeekPlan,
+} from '../domain/plan';
+import { generateKeySession } from '../domain/sessions';
 import { aimSuggestion, dailyAverageKm } from '../domain/aim';
 import {
   aimMonthTarget,
@@ -11,13 +32,13 @@ import {
   totalXp,
   type AchievementId,
 } from '../domain/game';
-import { addDays, dateRange, endOfDay, startOfDay, toDateKey } from '../domain/dates';
+import { addDays, dateRange, endOfDay, mondayOf, startOfDay, toDateKey } from '../domain/dates';
 import { generateGoal, LOOKBACK_DAYS, PLAN_VERSION } from '../domain/generator';
 import { activitiesOn, progressOf } from '../domain/progress';
 import { usualStartTime, type TimeOfDay } from '../domain/habits';
 import { readinessFor, type Night, type ReadinessLevel } from '../domain/readiness';
 import { computeStreak, type StreakState } from '../domain/streak';
-import type { Activity, DateKey, DayResult, DayStatus, GoalKind, GoalMeta, GoalSpec, Progress, Settings } from '../domain/types';
+import type { Activity, DateKey, DayResult, DayStatus, GoalMeta, GoalSpec, Progress, RegularKind, Settings } from '../domain/types';
 import type { ActivitySource } from '../sources/ActivitySource';
 
 /** Days that are always re-checked against Health Connect (late syncs, edits, deletions). */
@@ -43,6 +64,13 @@ export type Snapshot = {
   /** When you usually start moving, learned from the last 4 weeks. */
   usualTime: TimeOfDay | null;
   todayBoss: boolean;
+  /** This week's key sessions, and next week's from Sunday evening. */
+  plan: WeekPlan;
+  nextPlan: WeekPlan | null;
+  /** Key sessions this sync moved forward because their day passed. */
+  forwarded: KeySession[];
+  /** Estimated targets for upcoming key sessions (final targets are set on the day). */
+  previews: Record<DateKey, GoalSpec | null>;
   /** Your aim (km/day on average) and your actual average over the last 14 days. */
   aim: { km: number; averageKm: number; suggestion: number | null } | null;
   game: {
@@ -80,7 +108,7 @@ export async function refresh(
   db: SQLiteDatabase,
   source: ActivitySource,
   settings: Settings,
-  opts: { now?: Date; fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: GoalKind } = {},
+  opts: { now?: Date; fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: RegularKind } = {},
 ): Promise<Snapshot> {
   const today = toDateKey(opts.now ?? new Date());
   const start = settings.startDate;
@@ -108,13 +136,58 @@ export async function refresh(
   const mayReplaceToday =
     !!todays && (opts.regenerateToday || todays.planVersion < PLAN_VERSION || sleepArrived);
 
+  // Weekly plan (key sessions). Making one needs the same history as making goals.
+  const now = opts.now ?? new Date();
+  const thisMonday = mondayOf(today);
+  let plan = await loadWeekPlan(db, thisMonday);
+
   // Generating a goal needs LOOKBACK_DAYS of history; otherwise only the re-checked days.
-  const firstToGenerate = mayReplaceToday ? minKey(generateFrom, today) : generateFrom;
+  const firstToGenerate = mayReplaceToday || !plan ? minKey(generateFrom, today) : generateFrom;
   const fetchFrom =
     firstToGenerate <= today ? addDays(minKey(recheckFrom, firstToGenerate), -LOOKBACK_DAYS) : recheckFrom;
   const activities = await source.getActivities(startOfDay(fetchFrom), endOfDay(today));
 
-  if (todays && mayReplaceToday) {
+  const doneOn = (d: DateKey) => {
+    const g = goals.get(d)?.goal;
+    return !!g && progressOf(g, activitiesOn(d, activities), settings).done;
+  };
+  if (!plan) {
+    plan = planWeek(thisMonday, maxKey(today, start), activities, settings);
+    await saveWeekPlan(db, plan);
+  }
+  // Missed key sessions slide to the next free day this week.
+  const forwarded = forwardMissed(plan, today, doneOn);
+  if (forwarded.moved.length || forwarded.plan !== plan) {
+    plan = forwarded.plan;
+    await saveWeekPlan(db, plan);
+  }
+  // You picked another goal type for today: today's key session moves on.
+  const todaysSession = sessionOn(plan, today);
+  if (opts.todayKind && todaysSession) {
+    const to = freeDays(plan, today, true, todaysSession.kind)[0];
+    plan = to
+      ? moveSession(plan, todaysSession.kind, to, today, true)
+      : {
+          ...plan,
+          sessions: plan.sessions.map((x) => (x.kind === todaysSession.kind ? { ...x, dropped: true } : x)),
+        };
+    await saveWeekPlan(db, plan);
+  }
+  // Next week's plan from Sunday evening, so you can arrange it before Monday.
+  const nextMonday = addDays(thisMonday, 7);
+  let nextPlan = await loadWeekPlan(db, nextMonday);
+  if (!nextPlan && nextWeekVisible(now)) {
+    nextPlan = planWeek(nextMonday, nextMonday, activities, settings);
+    await saveWeekPlan(db, nextPlan);
+  }
+
+  // Today's goal must match the plan: a key session if one is on today, a regular goal otherwise.
+  const wantKey = sessionOn(plan, today)?.kind;
+  const haveKind = todays?.goal?.kind;
+  const isKey = (k?: string) => k === 'long_walk' || k === 'brisk_walk';
+  const planMismatch = !!todays && (wantKey ? haveKind !== wantKey : isKey(haveKind));
+
+  if (todays && (mayReplaceToday || planMismatch)) {
     const doneAlready = todays.goal
       ? progressOf(todays.goal, activitiesOn(today, activities), settings).done
       : false;
@@ -135,7 +208,11 @@ export async function refresh(
       const statuses = computeStreak(history, date, settings.restDaysPerWeek).statuses;
       const readiness = source.getNights ? readinessFor(date, nights) : undefined;
       const kind = date === today ? opts.todayKind : undefined;
-      daily = generateGoal({ date, settings, activities, history, statuses, readiness, kind });
+      const dayPlan = date >= thisMonday ? plan : await loadWeekPlan(db, mondayOf(date));
+      const key = sessionOn(dayPlan, date)?.kind;
+      daily = key
+        ? generateKeySession({ date, kind: key, settings, activities, history, readiness })
+        : generateGoal({ date, settings, activities, history, statuses, readiness, kind });
       await insertGoal(db, daily);
       goals.set(date, daily);
     }
@@ -216,6 +293,17 @@ export async function refresh(
       newlyUnlocked,
     },
     todayBoss: !!goals.get(today)?.meta?.boss,
+    plan,
+    nextPlan,
+    forwarded: forwarded.moved,
+    previews: Object.fromEntries(
+      [...plan.sessions, ...(nextPlan?.sessions ?? [])]
+        .filter((x) => x.day > today && !x.dropped)
+        .map((x) => [
+          x.day,
+          generateKeySession({ date: x.day, kind: x.kind, settings, activities, history }).goal,
+        ]),
+    ),
     aim: settings.dailyTargetKm
       ? {
           km: settings.dailyTargetKm,

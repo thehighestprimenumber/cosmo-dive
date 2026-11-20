@@ -10,7 +10,8 @@ import type {
   DateKey,
   DayResult,
   DayStatus,
-  GoalKind,
+  RegularGoalSpec,
+  RegularKind,
   GoalSpec,
   HrZone,
   DistanceSport,
@@ -22,7 +23,7 @@ import type {
  * that created them, so old history never gets silently reinterpreted, and
  * goals from older versions are never used as a starting point.
  */
-export const PLAN_VERSION = 5;
+export const PLAN_VERSION = 6;
 
 /** How far back "your typical day" looks. */
 export const LOOKBACK_DAYS = 90;
@@ -67,7 +68,7 @@ export type GeneratorInput = {
   /** Last night's sleep and resting heart rate, if available. */
   readiness?: Readiness;
   /** You picked the goal type yourself (e.g. a time goal on a kayak day). */
-  kind?: GoalKind;
+  kind?: RegularKind;
 };
 
 export function generateGoal({
@@ -91,7 +92,7 @@ export function generateGoal({
   const week = weekIndex(date, settings.startDate);
   const recovery = isRecoveryWeek(date, settings.startDate);
 
-  let spec: GoalSpec;
+  let spec: RegularGoalSpec;
   if (kind === 'hr_zone') {
     const zone: HrZone = week % 2 === 1 && !recovery ? 3 : 2;
     spec = { kind, zone, seconds: 0 };
@@ -198,9 +199,9 @@ export function generateGoal({
 }
 
 /** The weekly mix: the 7 days get a shuffled, balanced spread of goal types. */
-export function kindForDay(date: DateKey, hasHr: boolean): GoalKind {
+export function kindForDay(date: DateKey, hasHr: boolean): RegularKind {
   const monday = mondayOf(date);
-  const base: GoalKind[] = hasHr ? ['duration', 'distance', 'hr_zone'] : ['duration', 'distance'];
+  const base: RegularKind[] = hasHr ? ['duration', 'distance', 'hr_zone'] : ['duration', 'distance'];
   const kinds = Array.from({ length: 7 }, (_, i) => base[i % base.length]);
   shuffle(kinds, seedFrom(monday));
   avoidRepeats(kinds);
@@ -222,7 +223,7 @@ export type Typical = { value: number; days: number; label: string };
  * added up (several short walks count together; rides count at 1/rideFactor
  * for distance). Only days with 15+ minutes of exercise in total count.
  */
-export function dailyTotals(spec: GoalSpec, recent: Activity[], settings: Settings): number[] {
+export function dailyTotals(spec: RegularGoalSpec, recent: Activity[], settings: Settings): number[] {
   const byDay = new Map<DateKey, Activity[]>();
   for (const a of recent) {
     const d = toDateKey(a.start);
@@ -238,7 +239,7 @@ export function dailyTotals(spec: GoalSpec, recent: Activity[], settings: Settin
  * Your typical day for a goal type: the mode (most common value) of your
  * daily exercise totals over the lookback window. Needs at least 3 days.
  */
-export function baselineFor(spec: GoalSpec, recent: Activity[], settings: Settings): Typical | null {
+export function baselineFor(spec: RegularGoalSpec, recent: Activity[], settings: Settings): Typical | null {
   const totals = dailyTotals(spec, recent, settings);
   if (totals.length < 3) return null;
   const label =
@@ -270,7 +271,7 @@ export function mostCommon(xs: number[], bin: number): number {
   return best && best.length > 1 ? median(best) : m;
 }
 
-function sameType(a: GoalSpec, b: GoalSpec): boolean {
+export function sameType(a: GoalSpec, b: GoalSpec): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind === 'hr_zone' && b.kind === 'hr_zone') return a.zone === b.zone;
   if (a.kind === 'distance' && b.kind === 'distance') return a.suggestedSport === b.suggestedSport;
@@ -278,11 +279,11 @@ function sameType(a: GoalSpec, b: GoalSpec): boolean {
 }
 
 function targetOf(g: GoalSpec): number {
-  return g.kind === 'distance' ? g.meters : g.seconds;
+  return 'meters' in g ? g.meters : g.seconds;
 }
 
 function withTarget(g: GoalSpec, target: number): GoalSpec {
-  return g.kind === 'distance' ? { ...g, meters: target } : { ...g, seconds: target };
+  return 'meters' in g ? { ...g, meters: target } : { ...g, seconds: target };
 }
 
 function favouriteSport(recent: Activity[]): DistanceSport {

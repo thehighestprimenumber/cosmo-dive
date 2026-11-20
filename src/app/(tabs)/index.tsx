@@ -4,7 +4,7 @@ import { Animated, Pressable, RefreshControl, ScrollView, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatKm, formatMinutes, formatValue, goalEmoji, goalSubtitle, goalTitle } from '../../domain/format';
 import { weekSummary } from '../../domain/summary';
-import type { Activity, GoalKind } from '../../domain/types';
+import type { Activity, RegularKind } from '../../domain/types';
 import { addDays } from '../../domain/dates';
 import { ACHIEVEMENTS } from '../../domain/game';
 import { sourceFor } from '../../sources';
@@ -118,6 +118,15 @@ export default function TodayScreen() {
           </Card>
         )}
 
+        {snapshot?.forwarded.some((f) => f.day === snapshot.today) && (
+          <Card style={{ borderColor: colors.accent }}>
+            <Text style={styles.body}>
+              ↪️ Your {snapshot.forwarded.find((f) => f.day === snapshot.today)!.kind === 'long_walk' ? 'long walk' : 'brisk walk'}{' '}
+              moved to today: its day passed before you could do it.
+            </Text>
+          </Card>
+        )}
+
         {/* Today's goal */}
         {goal === null && (
           <Card>
@@ -165,7 +174,12 @@ export default function TodayScreen() {
                     );
                   })}
                 </View>
-                <Text style={styles.hint}>Time and heart rate goals count every sport, e.g. kayak or swimming.</Text>
+                <Text style={styles.hint}>
+                  Time and heart rate goals count every sport, e.g. kayak or swimming.
+                  {goal.kind === 'long_walk' || goal.kind === 'brisk_walk'
+                    ? ' Switching moves today’s key session to your next free day.'
+                    : ''}
+                </Text>
               </View>
             )}
             {snapshot.todayNotes.length > 0 && (
@@ -291,7 +305,7 @@ export default function TodayScreen() {
   );
 }
 
-const KIND_CHOICES: { kind: GoalKind; label: string }[] = [
+const KIND_CHOICES: { kind: RegularKind; label: string }[] = [
   { kind: 'distance', label: '📏 Distance' },
   { kind: 'duration', label: '⏱️ Time' },
   { kind: 'hr_zone', label: '❤️ Heart rate' },
