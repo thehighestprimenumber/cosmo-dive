@@ -1,6 +1,8 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { deleteGoal, insertGoal, lastGoalDate, loadGoals, loadResults, saveResults, saveSettings } from '../data/db';
+import { dailyAverageKm } from '../domain/aim';
 import {
+  aimMonthTarget,
   earnedAchievements,
   levelFor,
   monthKm,
@@ -41,6 +43,8 @@ export type Snapshot = {
   /** When you usually start moving, learned from the last 4 weeks. */
   usualTime: TimeOfDay | null;
   todayBoss: boolean;
+  /** Your aim (km/day on average) and your actual average over the last 14 days. */
+  aim: { km: number; averageKm: number } | null;
   game: {
     xp: number;
     level: number;
@@ -170,8 +174,10 @@ export async function refresh(
   const kmThisMonth = monthKm(activities, month, settings.rideFactor);
   let target = settings.monthTargets[month];
   const settingsPatch: Partial<Settings> = {};
-  if (target == null) {
-    target = monthTarget(month, activities, fetchFrom, settings.rideFactor);
+  if (target == null) target = monthTarget(month, activities, fetchFrom, settings.rideFactor);
+  // An aim of N km a day means at least N × days this month.
+  if (settings.dailyTargetKm) target = Math.max(target, aimMonthTarget(month, settings.dailyTargetKm));
+  if (target !== settings.monthTargets[month]) {
     settingsPatch.monthTargets = { ...settings.monthTargets, [month]: target };
   }
   const earned = earnedAchievements({
@@ -208,6 +214,9 @@ export async function refresh(
       newlyUnlocked,
     },
     todayBoss: !!goals.get(today)?.meta?.boss,
+    aim: settings.dailyTargetKm
+      ? { km: settings.dailyTargetKm, averageKm: dailyAverageKm(activities, today, settings.rideFactor) }
+      : null,
     today,
     todayGoal,
     todayNotes: goals.get(today)?.meta?.notes ?? [],

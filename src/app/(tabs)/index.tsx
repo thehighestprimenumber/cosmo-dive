@@ -196,6 +196,21 @@ export default function TodayScreen() {
           </Card>
         )}
 
+        {/* Aim */}
+        {snapshot?.aim && (
+          <Card>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Text style={styles.label}>🎯 Aim: {snapshot.aim.km} km a day</Text>
+              <Text style={styles.body}>{snapshot.aim.averageKm.toFixed(1)} km/day</Text>
+            </View>
+            <ProgressBar
+              fraction={Math.min(1, snapshot.aim.averageKm / snapshot.aim.km)}
+              done={snapshot.aim.averageKm >= snapshot.aim.km}
+            />
+            <Text style={styles.hint}>Your average over the last 14 days, counting every day.</Text>
+          </Card>
+        )}
+
         {/* This month */}
         {game && (
           <Card>

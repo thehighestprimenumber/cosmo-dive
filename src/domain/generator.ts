@@ -1,5 +1,6 @@
 import { addDays, daysBetween, mondayOf, toDateKey } from './dates';
 import { formatKm, formatMinutes } from './format';
+import { AIM_START, AIM_STEP, aimPerTrainingDay } from './aim';
 import { BOSS_FACTOR, isBossDay, XP } from './game';
 import { measure } from './progress';
 import type { Readiness } from './readiness';
@@ -21,7 +22,7 @@ import type {
  * that created them, so old history never gets silently reinterpreted, and
  * goals from older versions are never used as a starting point.
  */
-export const PLAN_VERSION = 4;
+export const PLAN_VERSION = 5;
 
 /** How far back "your typical day" looks. */
 export const LOOKBACK_DAYS = 90;
@@ -120,6 +121,16 @@ export function generateGoal({
   if (typical) notes.push(`Your most common ${typical.label}: ${fmt(typical.value)} (from ${typical.days} exercise days).`);
   else if (last?.meta) notes.push(`Continues from your last goal of this type (${fmt(last.meta.base)}).`);
 
+  // Your aim (Settings): average km per day. Start no lower than 60% of what a
+  // training day needs, then step up 10% per completed goal until there.
+  const aim = aimPerTrainingDay(kind, settings, recent);
+  if (aim) {
+    notes.push(
+      `Aim: ${settings.dailyTargetKm} km a day on average → ${fmt(aim)} on training days (${settings.restDaysPerWeek} rest days a week).`,
+    );
+    base = Math.max(base, aim * AIM_START);
+  }
+
   // 2. How it has been going. Rest days aren't misses.
   const isTraining = (h: DayResult) => {
     const st = statuses?.get(h.date);
@@ -131,6 +142,13 @@ export function generateGoal({
   if (missedTwo) {
     base *= EASE_OFF;
     notes.push('Easing off a little after two missed days.');
+  } else if (aim && base < aim) {
+    if (last?.done) {
+      base = Math.min(aim, base * AIM_STEP);
+      notes.push(`Up 10% toward your aim: you completed your last goal of this type.`);
+    } else if (last) {
+      notes.push('Holding steady until you complete this goal type, then up 10% toward your aim.');
+    }
   } else if (
     sameKind.length >= 2 &&
     sameKind.every((h) => h.done) &&
@@ -142,7 +160,7 @@ export function generateGoal({
   }
 
   // 3. Stay anchored to what you really do.
-  if (typical) base = clamp(base, typical.value * FLOOR, typical.value * CEILING);
+  if (typical) base = clamp(base, typical.value * FLOOR, Math.max(typical.value * CEILING, aim ?? 0));
   base = clamp(base, LIMITS[kind][0], LIMITS[kind][1]);
 
   // 4. Today-only tweaks (never carried into the next goal).

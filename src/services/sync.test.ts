@@ -174,5 +174,17 @@ describe('refresh', () => {
     expect(snap.todayProgress?.done).toBe(true);
     expect(snap.days.get('2026-11-19')?.status).toBe('done');
   });
+
+  it('an aim raises this month\'s challenge even if a lower one was already set', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const now = new Date(2026, 10, 20, 9, 0);
+    const s = { ...settings, startDate: '2026-11-20', monthTargets: { '2026-11': 40 } };
+    expect((await refresh(db, sourceOf([]), s, { now })).game.monthTarget).toBe(40);
+    const withAim = { ...s, dailyTargetKm: 5 };
+    const snap = await refresh(db, sourceOf([]), withAim, { now });
+    expect(snap.game.monthTarget).toBe(150);
+    expect(snap.aim).toEqual({ km: 5, averageKm: 0 });
+  });
 });
 

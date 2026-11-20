@@ -86,6 +86,11 @@ export type Settings = {
   restDaysPerWeek: number;
   /** How many ride metres count as one walk metre for distance goals. */
   rideFactor: number;
+  /**
+   * Optional aim: average km per day over all days (rest days count as zero).
+   * Goals step up toward it; the monthly challenge is at least aim × days.
+   */
+  dailyTargetKm: number | null;
   maxHr: number;
   /** "HH:MM" local time. */
   morningReminder: string;
@@ -109,6 +114,7 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   restDaysPerWeek: 2,
   rideFactor: 3,
+  dailyTargetKm: null,
   maxHr: 185,
   morningReminder: '08:00',
   eveningReminder: '19:30',

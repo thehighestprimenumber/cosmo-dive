@@ -395,3 +395,45 @@ describe('other sports (e.g. kayak)', () => {
     expect(g.meta?.notes[0]).toContain('You picked');
   });
 });
+
+describe('aim: average km per day', () => {
+  const aimSettings = { ...settings, dailyTargetKm: 5, restDaysPerWeek: 2 };
+  // Mostly short days: the "most common day" is ~2.3 km.
+  const shortDays = (date: string) =>
+    Array.from({ length: 10 }, (_, i) => act(addDays(date, -(i + 1)), { minutes: 28, distanceM: 2300 }));
+  const meters = (g: { goal: DayResult['goal'] }) => (g.goal as { meters: number }).meters;
+
+  it('needs aim × 7 / training days on a training day; time goals use your walking pace', async () => {
+    const { aimPerTrainingDay, walkingPace } = await import('./aim');
+    expect(aimPerTrainingDay('distance', aimSettings, [])).toBe(7000);
+    const walks = [1, 2, 3].map((i) => act(addDays('2026-11-19', -i), { minutes: 60, distanceM: 5000 })); // 12 min/km
+    expect(walkingPace(walks)).toBeCloseTo(0.72);
+    expect(aimPerTrainingDay('duration', aimSettings, walks)).toBeCloseTo(7000 * 0.72);
+    expect(aimPerTrainingDay('distance', { ...aimSettings, dailyTargetKm: null }, [])).toBeNull();
+  });
+
+  it('starts at 60% of the aim at least, even if your history is lower', () => {
+    const date = dayOfKind('distance');
+    expect(meters(generateGoal({ date, settings, activities: shortDays(date), history: [] }))).toBe(2300);
+    const g = generateGoal({ date, settings: aimSettings, activities: shortDays(date), history: [] });
+    expect(meters(g)).toBe(4200);
+    expect(g.meta?.notes.join(' ')).toContain('Aim: 5 km a day');
+  });
+
+  it('steps up 10% per completed goal of the same type, holds after a miss, stops at the aim', () => {
+    const date = dayOfKind('distance');
+    const spec = { kind: 'distance' as const, meters: 4200, suggestedSport: 'walk' as const };
+    const prev = (done: boolean, base: number) => v3(addDays(date, -3), spec, done, base);
+    const at = (h: DayResult[]) =>
+      generateGoal({ date, settings: aimSettings, activities: shortDays(date), history: h }).meta!.base;
+    expect(at([prev(true, 4200)])).toBe(4600); // 4620 rounded to 0.1 km
+    expect(at([prev(false, 4200)])).toBe(4200);
+    expect(at([prev(true, 6800)])).toBe(7000); // not held back by your 2.3 km history
+  });
+
+  it('averages every day of the last 2 weeks', async () => {
+    const { dailyAverageKm } = await import('./aim');
+    const acts = [act('2026-11-19', { distanceM: 7000 }), act('2026-11-10', { distanceM: 7000 }), act('2026-11-01', { distanceM: 9000 })];
+    expect(dailyAverageKm(acts, '2026-11-19', 3)).toBe(1);
+  });
+});

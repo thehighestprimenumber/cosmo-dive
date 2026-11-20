@@ -82,6 +82,12 @@ describe('monthly challenge', () => {
     expect(monthTarget('2026-11', [], '2026-10-01', 3)).toBe(20);
   });
 
+  it('an aim of 5 km a day means at least 150 km in November', async () => {
+    const { aimMonthTarget } = await import('./game');
+    expect(aimMonthTarget('2026-11', 5)).toBe(150);
+    expect(aimMonthTarget('2026-12', 4.3)).toBe(135); // 133.3 → 135
+  });
+
   it('counts walking-equivalent km this month', () => {
     const acts = [walk('2026-11-02', 6), { ...walk('2026-11-03', 15), sport: 'ride' as const }, walk('2026-10-31', 9)];
     expect(monthKm(acts, '2026-11', 3)).toBe(11);

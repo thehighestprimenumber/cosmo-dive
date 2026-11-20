@@ -98,6 +98,11 @@ export function monthTarget(
   return Math.max(20, Math.round((projected * 1.1) / 5) * 5);
 }
 
+/** With an aim of `km` a day on average, the month needs km × its days (rounded to 5 km). */
+export function aimMonthTarget(month: string, km: number): number {
+  return Math.round((km * daysInMonth(month)) / 5) * 5;
+}
+
 // ---------- Achievements ----------
 
 export type AchievementId =

@@ -25,6 +25,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
   const [restDaysPerWeek, setRestDaysPerWeek] = useState(settings.restDaysPerWeek);
   const [maxHr, setMaxHr] = useState(String(settings.maxHr));
   const [rideFactor, setRideFactor] = useState(String(settings.rideFactor));
+  const [aimKm, setAimKm] = useState(settings.dailyTargetKm ? String(settings.dailyTargetKm) : '');
   const [morning, setMorning] = useState(settings.morningReminder);
   const [evening, setEvening] = useState(settings.eveningReminder);
   const [smart, setSmart] = useState(settings.smartReminder);
@@ -33,6 +34,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
   const save = async () => {
     const hr = Number(maxHr);
     const factor = Number(rideFactor.replace(',', '.'));
+    const aim = aimKm.trim() ? Number(aimKm.replace(',', '.')) : null;
+    if (aim != null && !(aim > 0 && aim <= 40)) return Alert.alert('Aim should be between 0 and 40 km a day, or empty.');
     if (!(hr >= 120 && hr <= 230)) return Alert.alert('Max heart rate should be between 120 and 230.');
     if (!(factor >= 1 && factor <= 10)) return Alert.alert('Ride factor should be between 1 and 10.');
     if (!parseTime(morning) || !parseTime(evening)) return Alert.alert('Reminder times should look like 08:00.');
@@ -40,6 +43,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
       restDaysPerWeek,
       maxHr: hr,
       rideFactor: factor,
+      dailyTargetKm: aim,
       morningReminder: morning,
       eveningReminder: evening,
       smartReminder: smart,
@@ -95,6 +99,21 @@ function SettingsForm({ settings }: { settings: Settings }) {
               Number(maxHr) > 0
                 ? `Zone 2 = ${zoneRange(2, Number(maxHr)).join('–')} bpm · Zone 3 = ${zoneRange(3, Number(maxHr)).join('–')} bpm`
                 : undefined
+            }
+          />
+          <Field
+            label="Aim: average km per day (optional)"
+            value={aimKm}
+            onChangeText={setAimKm}
+            keyboardType="decimal-pad"
+            placeholder="e.g. 5"
+            hint={
+              Number(aimKm) > 0
+                ? `Averaging ${aimKm} km over every day means about ${(
+                    (Number(aimKm.replace(',', '.')) * 7) /
+                    Math.max(1, 7 - restDaysPerWeek)
+                  ).toFixed(1)} km on training days. Goals start at 60% of that at least and go up 10% each time you complete one, until they get there. The monthly challenge becomes at least ${aimKm} km × days in the month.`
+                : 'Leave empty to base goals only on your history.'
             }
           />
           <Field
