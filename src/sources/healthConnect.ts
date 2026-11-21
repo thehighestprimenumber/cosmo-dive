@@ -11,7 +11,7 @@ import {
 } from 'react-native-health-connect';
 import { toDateKey } from '../domain/dates';
 import { dedupeActivities } from '../domain/progress';
-import type { Period } from '../domain/cycle';
+import { periodsFromDays, type Period } from '../domain/cycle';
 import { lowPoint, type Night } from '../domain/readiness';
 import type { Activity, HrSample, Sport } from '../domain/types';
 import type { ActivitySource, SourceStatus } from './ActivitySource';
@@ -55,7 +55,9 @@ const between = (from: Date, to: Date) => ({
   endTime: to.toISOString(),
 });
 
-async function readAll<T extends 'ExerciseSession' | 'HeartRate' | 'SleepSession' | 'MenstruationPeriod'>(
+async function readAll<
+  T extends 'ExerciseSession' | 'HeartRate' | 'SleepSession' | 'MenstruationPeriod' | 'MenstruationFlow',
+>(
   type: T,
   from: Date,
   to: Date,
@@ -110,7 +112,11 @@ export const healthConnectSource: ActivitySource = {
 
   async requestCycleAccess() {
     if (!(await ensureInitialized())) return false;
-    const granted = await requestPermission([{ accessType: 'read', recordType: 'MenstruationPeriod' }]);
+    // Both record types use the same Android permission (read menstruation).
+    const granted = await requestPermission([
+      { accessType: 'read', recordType: 'MenstruationPeriod' },
+      { accessType: 'read', recordType: 'MenstruationFlow' },
+    ]);
     return granted.some((p) => p.recordType === 'MenstruationPeriod' && p.accessType === 'read');
   },
 
@@ -119,10 +125,14 @@ export const healthConnectSource: ActivitySource = {
     const records = await readAll('MenstruationPeriod', from, to);
     // The native module returns startTime/endTime (the record is an interval),
     // although the library's TypeScript type describes a single instant.
-    return records.map((r) => {
+    const periods = records.map((r) => {
       const rec = r as unknown as { startTime: string; endTime: string };
       return { start: toDateKey(new Date(rec.startTime)), end: toDateKey(new Date(new Date(rec.endTime).getTime() - 1)) };
     });
+    // Some apps (e.g. Samsung Health) log flow day by day instead of whole periods.
+    const flows = await readAll('MenstruationFlow', from, to).catch(() => []);
+    const flowDays = flows.map((r) => toDateKey(new Date((r as unknown as { time: string }).time)));
+    return [...periods, ...periodsFromDays(flowDays)];
   },
 
   async getNights(from: Date, to: Date): Promise<Night[]> {

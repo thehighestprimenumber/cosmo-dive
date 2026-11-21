@@ -15,6 +15,14 @@ export type CycleInfo = {
   periods: Period[];
   /** Where the cycle length comes from. */
   source: 'history' | 'settings';
+  /** Where the period length comes from: recorded periods, or the 5-day default. */
+  periodSource: 'history' | 'default';
+  /** Cycle lengths found in your records (days between period starts), oldest first. */
+  gaps: number[];
+  /** The most recent period you recorded (not predicted). */
+  lastKnown: Period;
+  /** How many periods are known (records and taps merged). */
+  knownCount: number;
 };
 
 /**
@@ -52,7 +60,28 @@ export function cycleInfo(
     last = addDays(last, cycleDays);
     periods.push({ start: last, end: addDays(last, periodDays - 1) });
   }
-  return { cycleDays, periodDays, periods, source: gaps.length >= 2 ? 'history' : 'settings' };
+  return {
+    cycleDays,
+    periodDays,
+    periods,
+    source: gaps.length >= 2 ? 'history' : 'settings',
+    periodSource: lengths.length ? 'history' : 'default',
+    gaps,
+    lastKnown: known[known.length - 1],
+    knownCount: known.length,
+  };
+}
+
+/** Days with flow logged → periods (days at most 2 apart belong to the same period). */
+export function periodsFromDays(days: DateKey[]): Period[] {
+  const sorted = [...new Set(days)].sort();
+  const out: Period[] = [];
+  for (const d of sorted) {
+    const prev = out[out.length - 1];
+    if (prev && daysBetween(prev.end, d) <= 2) prev.end = d;
+    else out.push({ start: d, end: d });
+  }
+  return out;
 }
 
 /** Overlapping or adjacent records become one period (e.g. a Health Connect record and a tap). */

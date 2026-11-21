@@ -332,6 +332,44 @@ function EventCard() {
 }
 
 /** Light weeks follow your period: from Health Connect, or a "started today" tap. */
+type CycleView = NonNullable<ReturnType<typeof useApp>['snapshot']>['cycle'];
+
+/** What the app read from your records, and what it predicts. */
+function CycleSummary({ cycle, today }: { cycle: NonNullable<CycleView>; today: DateKey }) {
+  const range = (p: { start: DateKey; end: DateKey }) => `${dayName(p.start)} – ${dayName(p.end)}`;
+  const ongoing = cycle.next && cycle.next.start <= today;
+  const rows: [string, string][] = [
+    [
+      'Cycle length',
+      cycle.source === 'history'
+        ? `${cycle.cycleDays} days (median of your last cycles: ${cycle.recentGaps.join(', ')})`
+        : `${cycle.cycleDays} days (your setting; needs 2 recorded cycles to learn it${
+            cycle.recentGaps.length ? `, found ${cycle.recentGaps[0]}` : ''
+          })`,
+    ],
+    [
+      'Period length',
+      `${cycle.periodDays} days${cycle.periodSource === 'history' ? ' (from your records)' : ' (default; your records have no end dates)'}`,
+    ],
+    ['Last recorded', `${range(cycle.lastKnown)} · ${cycle.knownCount} period${cycle.knownCount === 1 ? '' : 's'} known`],
+  ];
+  if (cycle.next && cycle.next.start !== cycle.lastKnown.start) {
+    rows.push([ongoing ? 'Now (predicted)' : 'Next (predicted)', `${range(cycle.next)} · in ${daysBetween(today, cycle.next.start)} days`]);
+  }
+  return (
+    <View style={{ marginBottom: 8 }}>
+      {rows
+        .filter(([, v]) => v)
+        .map(([k, v]) => (
+          <View key={k} style={{ marginBottom: 4 }}>
+            <Text style={[styles.body, { fontWeight: '700' }]}>{k}</Text>
+            <Text style={styles.muted}>{v}</Text>
+          </View>
+        ))}
+    </View>
+  );
+}
+
 function CycleCard() {
   const { settings, snapshot, updateSettings, refresh, logPeriodStart, syncing } = useApp();
   const [access, setAccess] = useState<boolean | null>(null);
@@ -353,9 +391,10 @@ function CycleCard() {
   return (
     <Card>
       <Label>🌸 Light week with your period</Label>
-      <Text style={styles.muted}>
+      {cycle ? <CycleSummary cycle={cycle} today={snapshot.today} /> : null}
+      <Text style={[styles.muted, { marginBottom: 4 }]}>
         {cycle?.next
-          ? `Next period expected around ${dayName(cycle.next.start)}: that week is your light week (25% less, no pace push). Cycle: ${cycle.cycleDays} days${cycle.source === 'history' ? ', learned from your records' : ''}.`
+          ? 'The week with most of your next period is your light week (25% less, no pace push).'
           : 'Tell Daily Spark when your period starts and the light week will fall on it. Without it, every 4th week is light.'}{' '}
         This stays on your phone.
       </Text>
@@ -377,7 +416,11 @@ function CycleCard() {
         value={cycleDays}
         onChangeText={setCycleDays}
         keyboardType="number-pad"
-        hint="Used until 2 cycles are recorded."
+        hint={
+          cycle?.source === 'history'
+            ? 'Not used now: your cycle length comes from your records.'
+            : 'Used until 2 cycles are recorded.'
+        }
       />
       <Button
         title="Save cycle length"

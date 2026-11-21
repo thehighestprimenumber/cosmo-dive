@@ -2,6 +2,13 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-21: cycle details on the Week tab
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| What's shown | Cycle length and where it comes from (the median of your last cycles, listed, or your setting), period length (from records or the 5-day default), the last recorded period and how many are known, and the next predicted period with "in N days" | The owner asked to see what the app reads and predicts. `CycleSummary` in `src/app/(tabs)/week.tsx` |
+| Day-by-day flow | Health Connect "menstruation flow" days are read too and grouped into periods (days up to 2 apart = one period), alongside "menstruation period" records | Some apps (e.g. Samsung Health) log flow per day instead of whole periods. Same Android permission. `periodsFromDays` |
+
 ## 2026-11-21: AI coach, step 1: the Sunday review
 
 The owner agreed: the AI only *proposes*, as concrete changes the plan's rules check, and nothing changes until they tap Apply. First step: the weekly review on Sunday evening; a chat comes later.

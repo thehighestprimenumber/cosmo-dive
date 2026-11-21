@@ -90,7 +90,17 @@ export type Snapshot = {
     elevationKnown: boolean;
   };
   /** Your cycle, if known (period records or "started today" taps). */
-  cycle: { cycleDays: number; source: 'history' | 'settings'; next: Period | null } | null;
+  cycle: {
+    cycleDays: number;
+    source: 'history' | 'settings';
+    periodDays: number;
+    periodSource: 'history' | 'default';
+    /** Recent cycle lengths from your records, oldest first (at most 6). */
+    recentGaps: number[];
+    lastKnown: Period;
+    knownCount: number;
+    next: Period | null;
+  } | null;
   /** This week's key sessions, and next week's from Sunday evening. */
   plan: WeekPlan;
   nextPlan: WeekPlan | null;
@@ -488,7 +498,16 @@ export async function refresh(
       };
     })(),
     cycle: cycle
-      ? { cycleDays: cycle.cycleDays, source: cycle.source, next: nextPeriod(cycle, today) }
+      ? {
+          cycleDays: cycle.cycleDays,
+          source: cycle.source,
+          periodDays: cycle.periodDays,
+          periodSource: cycle.periodSource,
+          recentGaps: cycle.gaps.slice(-6),
+          lastKnown: cycle.lastKnown,
+          knownCount: cycle.knownCount,
+          next: nextPeriod(cycle, today),
+        }
       : null,
     forwarded: forwarded.moved,
     previews: Object.fromEntries(
