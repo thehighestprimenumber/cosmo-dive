@@ -1,0 +1,7 @@
+{
+  "name": "wear-sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sends the widget state to the Daily Spark watch app over the Wear OS Data Layer.",
+  "main": "index.ts"
+}

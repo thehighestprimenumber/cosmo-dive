@@ -71,6 +71,23 @@ jobs:
       - name: Rename APK
         run: cp android/app/build/outputs/apk/release/app-release.apk "daily-spark-${GITHUB_RUN_NUMBER}.apk"
 
+      # Watch app (Wear OS Tile). Signed with the phone app's key (from prebuild) so the
+      # Data Layer connects them. Doesn't block the phone APK while it's being tuned.
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Build watch APK
+        id: watch
+        continue-on-error: true
+        run: |
+          gradle -p wear :app:assembleRelease --no-daemon
+          cp wear/app/build/outputs/apk/release/app-release.apk "daily-spark-watch-${GITHUB_RUN_NUMBER}.apk"
+
+      - name: Report watch build
+        if: steps.watch.outcome == 'failure'
+        run: echo "::warning::Watch APK build failed; the phone APK is still published."
+
       - uses: actions/upload-artifact@v5
         with:
           name: daily-spark-apk
@@ -104,7 +121,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           # The launch check gates publishing; the walkthrough only reports.
-          script: ./scripts/smoke-test.sh "$(ls daily-spark-*.apk | head -1)" || exit 1; ./scripts/walkthrough.sh > walkthrough.log 2>&1 || touch walkthrough-failed; cat walkthrough.log || true
+          script: ./scripts/smoke-test.sh "daily-spark-${GITHUB_RUN_NUMBER}.apk" || exit 1; ./scripts/walkthrough.sh > walkthrough.log 2>&1 || touch walkthrough-failed; cat walkthrough.log || true
 
       - name: Report walkthrough
         if: always()
@@ -137,7 +154,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "build-${GITHUB_RUN_NUMBER}" "daily-spark-${GITHUB_RUN_NUMBER}.apk" \
+          WATCH=""
+          if [ -f "daily-spark-watch-${GITHUB_RUN_NUMBER}.apk" ]; then WATCH="daily-spark-watch-${GITHUB_RUN_NUMBER}.apk"; fi
+          gh release create "build-${GITHUB_RUN_NUMBER}" "daily-spark-${GITHUB_RUN_NUMBER}.apk" $WATCH \
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --prerelease \

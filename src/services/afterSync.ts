@@ -5,6 +5,7 @@ import { ACHIEVEMENTS } from '../domain/game';
 import { widgetStateFrom } from '../widget/state';
 import { saveWidgetState } from '../widget/store';
 import { updateTodayWidget } from '../widget/update';
+import { sendStateToWatch } from '../../modules/wear-sync';
 import { notifyAchievements, notifyAimReached, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
 import type { Snapshot } from './sync';
 
@@ -25,6 +26,8 @@ export async function afterSync(
     const state = widgetStateFrom(snap, settings);
     await saveWidgetState(db, state);
     await updateTodayWidget(state);
+    // Same content for the watch Tile.
+    await sendStateToWatch(JSON.stringify(state));
   } catch {
     // A widget problem must never break syncing.
   }

@@ -2,6 +2,17 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-21: watch Tile (Galaxy Watch5 Pro, Wear OS)
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Content | Exactly the widget's content (`WidgetState` JSON), so phone widget and Tile always agree | `src/widget/state.ts` ↔ `wear/.../SparkState.kt` |
+| Transport | Wear OS Data Layer: after every sync the phone puts the JSON at `/widget-state` (local Expo module `modules/wear-sync`); the watch's listener stores it and refreshes the Tile | No server, works over Bluetooth |
+| Watch app | Separate native Kotlin project in `wear/` (Tiles + ProtoLayout Material): progress ring on the edge, streak/level, goal, "X of Y", climb, week dots; tap opens a small detail screen | Tiles are native-only; React Native doesn't run on the Tile |
+| Same app id + key | `com.dailyspark.app`, signed with the phone app's key (from `expo prebuild`) | Required for the Data Layer to pair phone and watch apps |
+| CI | Watch APK built after the phone APK (Gradle 8.11.1, AGP 8.7.3) and published in the same release; a watch build failure only warns | Phone updates keep flowing while the watch app is tuned |
+| Not yet | Complication, interval guidance, recording workouts on the watch | Next steps once the Tile looks right |
+
 ## 2026-11-21: home-screen widget (before the watch Tile)
 
 The owner wants a phone widget equivalent to a watch Tile first; once it works as wanted, the same content goes to the Galaxy Watch.
