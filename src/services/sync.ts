@@ -10,6 +10,7 @@ import {
   saveSettings,
   saveWeekPlan,
 } from '../data/db';
+import { isAerobicPhase, WEEKLY_ZONE2_SHARE, zone2Minutes } from '../domain/aerobic';
 import { cycleInfo, isPeriodWeek, nextPeriod, type Period } from '../domain/cycle';
 import { hasElevationData, longWalkClimb, typicalClimbPerKm } from '../domain/elevation';
 import {
@@ -28,7 +29,7 @@ import {
 } from '../domain/plan';
 import { planVolume, rebalancedDayKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
 import { generateKeySession } from '../domain/sessions';
-import { aimSuggestion, dailyAverageKm } from '../domain/aim';
+import { aimSuggestion, dailyAverageKm, walkingPace } from '../domain/aim';
 import {
   aimMonthTarget,
   earnedAchievements,
@@ -78,6 +79,8 @@ export type Snapshot = {
     doneKm: number;
     leftKm: number;
     lastWeekKm: number;
+    /** Zone 2 minutes this week vs. ~35% of the week's walking time; `aerobic` = altitude base phase. */
+    zone2: { minutes: number; targetMin: number; aerobic: boolean };
     /** Metres climbed this week, and whether your walks come with elevation at all. */
     climbM: number;
     elevationKnown: boolean;
@@ -355,6 +358,7 @@ export async function refresh(
             dayKm,
             planNotes,
             light: !!volume.light,
+            aerobic: isAerobicPhase(date, settings.event),
           });
         }
       } else {
@@ -453,6 +457,15 @@ export async function refresh(
         doneKm: Math.round(doneKm * 10) / 10,
         leftKm: Math.max(0, Math.round((volume.km - doneKm) * 10) / 10),
         lastWeekKm: Math.round(weekKm(activities, addDays(thisMonday, -7), rf) * 10) / 10,
+        zone2: (() => {
+          const aerobic = isAerobicPhase(today, settings.event);
+          const pace = walkingPace(activities) ?? 0.72;
+          return {
+            minutes: zone2Minutes(activities, thisMonday, today, settings.maxHr),
+            targetMin: Math.round((volume.km * 1000 * pace * WEEKLY_ZONE2_SHARE) / 60),
+            aerobic,
+          };
+        })(),
         climbM: Math.round(
           activities
             .filter((a) => toDateKey(a.start) >= thisMonday && toDateKey(a.start) <= today)

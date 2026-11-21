@@ -1,5 +1,6 @@
 import { addDays, daysBetween, mondayOf, toDateKey } from './dates';
 import { formatKm, formatMinutes, formatPace } from './format';
+import { AEROBIC_ZONE_SHARE } from './aerobic';
 import { AIM_START, AIM_STEP, aimPerTrainingDay, walkingPace } from './aim';
 import { BOSS_FACTOR, isBossDay, XP } from './game';
 import { measure } from './progress';
@@ -78,6 +79,8 @@ export type GeneratorInput = {
   planNotes?: string[];
   /** Light week: heart-rate goals stay in Zone 2. */
   light?: boolean;
+  /** Aerobic-base phase (event at altitude): more Zone 2 days, longer in zone. */
+  aerobic?: boolean;
 };
 
 /** Heart-rate goals ask for this share of the day's time in the zone. */
@@ -95,6 +98,7 @@ export function generateGoal({
   dayKm,
   planNotes = [],
   light,
+  aerobic,
 }: GeneratorInput): DailyGoal {
   const windowStart = addDays(date, -LOOKBACK_DAYS);
   const recent = activities.filter((a) => {
@@ -104,13 +108,13 @@ export function generateGoal({
   const past = history.filter((h) => h.date < date).sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const hasHr = recent.some((a) => a.hr.length >= 2);
-  const kind = chosenKind ?? kindForDay(date, hasHr);
+  const kind = chosenKind ?? kindForDay(date, hasHr, aerobic);
   const week = weekIndex(date, settings.startDate);
   const recovery = isRecoveryWeek(date, settings.startDate);
 
   let spec: RegularGoalSpec;
   if (kind === 'hr_zone') {
-    const zone: HrZone = week % 2 === 1 && !recovery ? 3 : 2;
+    const zone: HrZone = !aerobic && !light && week % 2 === 1 && !recovery ? 3 : 2;
     spec = { kind, zone, seconds: 0 };
   } else if (kind === 'distance') {
     spec = { kind, meters: 0, suggestedSport: favouriteSport(recent) };
@@ -119,7 +123,7 @@ export function generateGoal({
   }
   const notes: string[] = [];
   if (dayKm != null) {
-    return fromWeeklyPlan({ date, spec, dayKm, recent, readiness, chosen: !!chosenKind, planNotes, light });
+    return fromWeeklyPlan({ date, spec, dayKm, recent, readiness, chosen: !!chosenKind, planNotes, light, aerobic });
   }
   if (chosenKind) notes.push('You picked this goal type for today.');
   const fmt = (v: number) => (kind === 'distance' ? formatKm(v) : formatMinutes(v));
@@ -231,6 +235,7 @@ function fromWeeklyPlan(p: {
   chosen: boolean;
   planNotes: string[];
   light?: boolean;
+  aerobic?: boolean;
 }): DailyGoal {
   const { date, dayKm, recent, readiness } = p;
   let spec = p.spec;
@@ -241,7 +246,10 @@ function fromWeeklyPlan(p: {
   let base: number;
   if (kind === 'distance') base = dayKm * 1000;
   else if (kind === 'duration') base = dayKm * 1000 * pace;
-  else base = dayKm * 1000 * pace * ZONE_SHARE;
+  else base = dayKm * 1000 * pace * (p.aerobic ? AEROBIC_ZONE_SHARE : ZONE_SHARE);
+  if (p.aerobic && kind !== 'distance') {
+    notes.push('Aerobic base for the altitude: easy pace, you should be able to chat. Zone 2 makes the same effort cheaper up high.');
+  }
   if (kind !== 'distance') {
     notes.push(`${formatKm(dayKm * 1000)} at your walking pace (${formatPace(pace * 1000)}) is about ${formatMinutes(dayKm * 1000 * pace)}.`);
   }
@@ -271,9 +279,16 @@ function fromWeeklyPlan(p: {
 }
 
 /** The weekly mix: the 7 days get a shuffled, balanced spread of goal types. */
-export function kindForDay(date: DateKey, hasHr: boolean): RegularKind {
+export function kindForDay(date: DateKey, hasHr: boolean, aerobic = false): RegularKind {
   const monday = mondayOf(date);
-  const base: RegularKind[] = hasHr ? ['duration', 'distance', 'hr_zone'] : ['duration', 'distance'];
+  // Aerobic-base phase: about half the days are Zone 2 (or easy time without heart rate data).
+  const base: RegularKind[] = aerobic
+    ? hasHr
+      ? ['hr_zone', 'distance', 'hr_zone', 'duration']
+      : ['duration', 'distance', 'duration']
+    : hasHr
+      ? ['duration', 'distance', 'hr_zone']
+      : ['duration', 'distance'];
   const kinds = Array.from({ length: 7 }, (_, i) => base[i % base.length]);
   shuffle(kinds, seedFrom(monday));
   avoidRepeats(kinds);

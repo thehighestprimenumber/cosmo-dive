@@ -2,6 +2,20 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-21: aerobic base for altitude
+
+The owner chose option 1 (a stronger aerobic base) over acclimatisation days and altitude monitoring. Altitude itself can't be trained from the app (adaptation needs low-oxygen exposure); a better aerobic base makes the same effort cheaper, which offsets part of the missing oxygen.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Trigger | Optional "highest altitude (m)" on the dated goal; 1500 m or more turns the phase on | `ALTITUDE_M` in `src/domain/aerobic.ts` |
+| When | The 16 weeks before the pre-event week | `AEROBIC_WEEKS` |
+| Regular days | Mix weighted to Zone 2: hr_zone, distance, hr_zone, duration (≈ half the days). Without heart rate data: more time goals instead | `kindForDay(…, aerobic)` |
+| Heart rate goals | Always Zone 2 (no Zone 3 alternation) and 70% of the day's time in zone instead of 50% | `AEROBIC_ZONE_SHARE` |
+| Weekly view | "Zone 2: X of Y min", target ≈ 35% of the week's walking time (shown all the time, not only in the phase) | `WEEKLY_ZONE2_SHARE` |
+| Unchanged | Weekly km, long/brisk walks, climb, light weeks | The phase only changes how regular days are spent |
+| Later, if wanted | Acclimatisation days on arrival; monitoring resting HR / SpO2 during the trip | Offered, not chosen yet |
+
 ## 2026-11-21: climb (elevation gain)
 
 | Topic | Decision | Why / how to change |

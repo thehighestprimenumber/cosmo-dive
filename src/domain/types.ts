@@ -84,7 +84,15 @@ export type GoalMeta = {
  * A dated goal the plan builds toward, e.g. a 15 km hike on 31 Dec, or a
  * multi-day trek: `km` per day for `days` days in a row from `date`.
  */
-export type GoalEvent = { name: string; km: number; date: DateKey; days?: number; ascentM?: number };
+export type GoalEvent = {
+  name: string;
+  km: number;
+  date: DateKey;
+  days?: number;
+  ascentM?: number;
+  /** Highest altitude (m); 1500+ adds an aerobic-base (Zone 2) phase. */
+  altitudeM?: number;
+};
 
 /**
  * Stored once per day and never rewritten (except today's, see sync.ts).

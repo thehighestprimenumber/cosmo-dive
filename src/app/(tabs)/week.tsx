@@ -90,6 +90,15 @@ function VolumeCard() {
         {doneKm} km done · {leftKm} km left
         {snapshot.week.elevationKnown ? ` · ⛰️ ${snapshot.week.climbM} m climbed` : ''}
       </Text>
+      <Text style={styles.body}>
+        ❤️ Zone 2: {snapshot.week.zone2.minutes} of {snapshot.week.zone2.targetMin} min
+      </Text>
+      {snapshot.week.zone2.aerobic && (
+        <Text style={styles.hint}>
+          Aerobic base phase for the altitude: more easy Zone 2 days. A stronger base makes the same effort cheaper
+          when there’s less oxygen.
+        </Text>
+      )}
       {ev?.ascentM && !snapshot.week.elevationKnown ? (
         <Text style={[styles.hint, { color: colors.pending }]}>
           No elevation from your watch yet, so long walks don’t have a climb target. Check Diagnostics, and that Samsung
@@ -200,6 +209,7 @@ function EventCard() {
   const [days, setDays] = useState(settings?.event?.days ? String(settings.event.days) : '1');
   const [date, setDate] = useState(settings?.event?.date ?? '');
   const [climb, setClimb] = useState(settings?.event?.ascentM ? String(settings.event.ascentM) : '');
+  const [altitude, setAltitude] = useState(settings?.event?.altitudeM ? String(settings.event.altitudeM) : '');
   if (!settings || !snapshot) return null;
   const ev = settings.event;
 
@@ -214,7 +224,16 @@ function EventCard() {
     }
     const up = climb.trim() ? Number(climb) : 0;
     if (!(up >= 0 && up <= 3000)) return Alert.alert('Climb per day should be 0–3000 m, or empty.');
-    const event: GoalEvent = { name: name.trim(), km: k, date, days: n, ...(up ? { ascentM: up } : {}) };
+    const alt = altitude.trim() ? Number(altitude) : 0;
+    if (!(alt >= 0 && alt <= 6000)) return Alert.alert('Altitude should be 0–6000 m, or empty.');
+    const event: GoalEvent = {
+      name: name.trim(),
+      km: k,
+      date,
+      days: n,
+      ...(up ? { ascentM: up } : {}),
+      ...(alt ? { altitudeM: alt } : {}),
+    };
     await updateSettings({ event });
     setEditing(false);
     await refresh({ regenerateToday: true });
@@ -229,6 +248,7 @@ function EventCard() {
         <Text style={styles.h2}>
           {ev.name}: {multi ? `${ev.days} days × ${ev.km} km` : `${ev.km} km`}
           {ev.ascentM ? `, ⛰️ ${ev.ascentM} m up a day` : ''}
+          {ev.altitudeM ? `, up to ${ev.altitudeM} m` : ''}
         </Text>
         <Text style={styles.muted}>
           {until <= 0 ? 'It’s on! You’ve trained for this.' : `Starts ${ev.date} · in ${until} days (${Math.round(until / 7)} weeks)`}.
@@ -286,6 +306,14 @@ function EventCard() {
         keyboardType="number-pad"
         placeholder="900"
         hint="Metres up on the hardest day. Long walks then become hill walks that build up to it."
+      />
+      <Field
+        label="Highest altitude (m, optional)"
+        value={altitude}
+        onChangeText={setAltitude}
+        keyboardType="number-pad"
+        placeholder="3000"
+        hint="From 1500 m, the 16 weeks before the trip build your aerobic base: more easy Zone 2 days."
       />
       <Field
         label="First day"
