@@ -11,6 +11,7 @@ import {
   saveWeekPlan,
 } from '../data/db';
 import { isAerobicPhase, WEEKLY_ZONE2_SHARE, zone2Minutes } from '../domain/aerobic';
+import { withAllDayWalking } from '../domain/allday';
 import { cycleInfo, isPeriodWeek, nextPeriod, type Period } from '../domain/cycle';
 import { hasElevationData, longWalkClimb, typicalClimbPerKm } from '../domain/elevation';
 import {
@@ -168,7 +169,12 @@ export async function refresh(
   const firstToGenerate = mayReplaceToday || !plan ? minKey(generateFrom, today) : generateFrom;
   const fetchFrom =
     firstToGenerate <= today ? addDays(minKey(recheckFrom, firstToGenerate), -LOOKBACK_DAYS) : recheckFrom;
-  const activities = await source.getActivities(startOfDay(fetchFrom), endOfDay(today));
+  const sessions = await source.getActivities(startOfDay(fetchFrom), endOfDay(today));
+  // Add each day's distance outside recorded workouts (what Samsung shows as "distance while active").
+  const dailyDistance = source.getDailyDistance
+    ? await source.getDailyDistance(startOfDay(fetchFrom), endOfDay(today)).catch(() => ({}))
+    : {};
+  const activities = withAllDayWalking(sessions, dailyDistance);
 
   const doneOn = (d: DateKey) => {
     const g = goals.get(d)?.goal;
@@ -201,7 +207,7 @@ export async function refresh(
       prev,
       periodWeek: cycle ? isPeriodWeek(monday, cycle) : null,
     });
-    return provisional ? { ...v, provisional: true } : v;
+    return { ...v, v: PLAN_VERSION, ...(provisional ? { provisional: true } : {}) };
   };
   const trekDaysIn = (monday: DateKey): DateKey[] => {
     const ev = settings.event;
@@ -223,7 +229,7 @@ export async function refresh(
   if (!plan) {
     plan = await makePlan(thisMonday, maxKey(today, start), false);
     await saveWeekPlan(db, plan);
-  } else if (!plan.volume || plan.volume.provisional || opts.regenerateToday) {
+  } else if (!plan.volume || plan.volume.provisional || plan.volume.v !== PLAN_VERSION || opts.regenerateToday) {
     // Plans from before weekly volumes, plans made on Sunday for this week, or
     // a changed aim / event: (re)compute this week's km, keeping the days you arranged.
     plan = { ...plan, volume: await volumeFor(thisMonday, false) };

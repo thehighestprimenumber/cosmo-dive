@@ -50,6 +50,20 @@ export const demoSource: ActivitySource = {
     return out.filter((a) => a.start >= from.getTime() && a.start < to.getTime());
   },
 
+  async getDailyDistance(from: Date, to: Date): Promise<Record<string, number>> {
+    // Recorded walks plus a few km of everyday walking.
+    const out: Record<string, number> = {};
+    for (const a of await demoSource.getActivities(from, to)) {
+      const d = toDateKey(a.start);
+      out[d] = (out[d] ?? 0) + (a.distanceM ?? 0);
+    }
+    for (let d = toDateKey(from); startOfDay(d) < to; d = addDays(d, 1)) {
+      if (startOfDay(d).getTime() > Date.now()) break;
+      out[d] = (out[d] ?? 0) + 2000 + rand(d + 'steps') * 4000;
+    }
+    return out;
+  },
+
   hasCycleAccess: async () => true,
   requestCycleAccess: async () => true,
   getPeriods: async () => [],

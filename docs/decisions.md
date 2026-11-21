@@ -2,6 +2,22 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-21: real numbers (all-day distance, split walks)
+
+From the owner's screenshots: Samsung Health showed 13.97 km for the day and a recorded 13.01 km walk, but the app saw a 7.7 km long walk, a 1.4 km/day average and 19 km for November.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| All-day distance | Read Health Connect's daily Distance total; what's beyond recorded workouts becomes one synthetic "other walking" activity per day | `src/domain/allday.ts`; Samsung counts all walking, not only workouts |
+| Where it counts | Distance goals, weekly km, typical week/day, aim average, monthly challenge, weekday scores for planning | Matches what the owner sees in Samsung Health |
+| Where it doesn't | Long walk, brisk walk, climb, walking pace, usual start time, time and heart-rate goals | Those need a real recorded outing / duration |
+| Active day | A day counts for your typical day with 15+ min of exercise **or 1.5+ km of walking** | All-day distance has no duration |
+| Session distance | max(distance from the session's own app, distance from all apps) in its time window | Watch and phone can write a workout's distance under different origins |
+| Split recordings | Recorded walks less than 20 min apart are one outing for the long walk (distance and climb add up) | A break or a recording split in two is still one walk |
+| Rules version | `PLAN_VERSION` 8; this week's km is recomputed on update | |
+
+**Unconfirmed:** which of the two causes made the 13 km walk show as 7.7 km. Diagnostics now lists each session's distance and the daily totals to check.
+
 ## 2026-11-21: aerobic base for altitude
 
 The owner chose option 1 (a stronger aerobic base) over acclimatisation days and altitude monitoring. Altitude itself can't be trained from the app (adaptation needs low-oxygen exposure); a better aerobic base makes the same effort cheaper, which offsets part of the missing oxygen.

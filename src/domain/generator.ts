@@ -24,12 +24,14 @@ import type {
  * that created them, so old history never gets silently reinterpreted, and
  * goals from older versions are never used as a starting point.
  */
-export const PLAN_VERSION = 7;
+export const PLAN_VERSION = 8;
 
 /** How far back "your typical day" looks. */
 export const LOOKBACK_DAYS = 90;
-/** A day counts as an exercise day with at least this much exercise in total. */
+/** A day counts as an exercise day with at least this much exercise in total… */
 export const MIN_ACTIVE_DAY_S = 15 * 60;
+/** …or this much walking (all-day distance has no duration). */
+export const MIN_ACTIVE_DAY_M = 1500;
 /** Bin widths for finding the most common daily total. */
 const MODE_BIN = { distance: 500, duration: 5 * 60, hr_zone: 5 * 60 } as const;
 
@@ -317,7 +319,11 @@ export function dailyTotals(spec: RegularGoalSpec, recent: Activity[], settings:
     byDay.set(d, [...(byDay.get(d) ?? []), a]);
   }
   return [...byDay.values()]
-    .filter((acts) => acts.reduce((t, a) => t + a.durationS, 0) >= MIN_ACTIVE_DAY_S)
+    .filter(
+      (acts) =>
+        acts.reduce((t, a) => t + a.durationS, 0) >= MIN_ACTIVE_DAY_S ||
+        acts.reduce((t, a) => t + (a.sport === 'walk' ? (a.distanceM ?? 0) : 0), 0) >= MIN_ACTIVE_DAY_M,
+    )
     .map((acts) => measure(spec, acts, settings))
     .filter((v) => v > 0);
 }

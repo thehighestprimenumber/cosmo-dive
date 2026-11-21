@@ -1,6 +1,7 @@
 import {
   ExerciseType,
   SdkAvailabilityStatus,
+  aggregateGroupByPeriod,
   aggregateRecord,
   getGrantedPermissions,
   getSdkStatus,
@@ -82,6 +83,23 @@ export const healthConnectSource: ActivitySource = {
     if (!(await ensureInitialized())) return false;
     const granted = await requestPermission([{ accessType: 'read', recordType: 'SleepSession' }]);
     return granted.some((p) => p.recordType === 'SleepSession' && p.accessType === 'read');
+  },
+
+  /** Total distance per local day (everything Samsung counts as "distance while active"). */
+  async getDailyDistance(from: Date, to: Date): Promise<Record<string, number>> {
+    await ensureInitialized();
+    const groups = await aggregateGroupByPeriod({
+      recordType: 'Distance',
+      timeRangeFilter: between(from, to),
+      timeRangeSlicer: { period: 'DAYS', length: 1 },
+    }).catch(() => []);
+    const out: Record<string, number> = {};
+    for (const g of groups) {
+      const m = g.result.DISTANCE?.inMeters ?? 0;
+      // Slices are local days; the start is a local date-time like "2026-11-21T00:00".
+      if (m > 0) out[g.startTime.slice(0, 10)] = m;
+    }
+    return out;
   },
 
   async hasCycleAccess() {
@@ -172,13 +190,23 @@ export const healthConnectSource: ActivitySource = {
         const end = new Date(s.endTime);
         const origin = s.metadata?.dataOrigin ?? 'unknown';
 
-        // Distance from the same app that recorded the session, so it isn't double counted.
-        const dist = await aggregateRecord({
+        // Distance in the session's time window: from the app that recorded it, and from all apps
+        // (Health Connect de-duplicates across apps). The watch and the phone can write a workout's
+        // distance under different origins, so take the larger of the two.
+        const sameApp = await aggregateRecord({
           recordType: 'Distance',
           timeRangeFilter: between(start, end),
           dataOriginFilter: origin === 'unknown' ? undefined : [origin],
-        });
-        const distanceM = dist.DISTANCE?.inMeters ?? 0;
+        })
+          .then((r) => r.DISTANCE?.inMeters ?? 0)
+          .catch(() => 0);
+        const allApps =
+          origin === 'unknown'
+            ? sameApp
+            : await aggregateRecord({ recordType: 'Distance', timeRangeFilter: between(start, end) })
+                .then((r) => r.DISTANCE?.inMeters ?? 0)
+                .catch(() => 0);
+        const distanceM = Math.max(sameApp, allApps);
         // Climb from the same app; null when not shared/permitted (not the same as a flat 0 m walk).
         const ascentM = await aggregateRecord({
           recordType: 'ElevationGained',

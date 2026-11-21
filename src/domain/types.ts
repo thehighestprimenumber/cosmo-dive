@@ -35,6 +35,8 @@ export type Activity = {
   label?: string;
   /** Metres climbed during it, when the watch/app records elevation. */
   ascentM?: number | null;
+  /** Not a recorded workout: the rest of the day's distance (see allday.ts). */
+  synthetic?: boolean;
 };
 
 export type HrZone = 1 | 2 | 3 | 4 | 5;

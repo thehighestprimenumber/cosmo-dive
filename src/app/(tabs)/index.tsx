@@ -296,9 +296,18 @@ export default function TodayScreen() {
         {snapshot && snapshot.todayActivities.length > 0 && (
           <Card>
             <Text style={styles.label}>Today’s activities</Text>
-            {snapshot.todayActivities.map((a) => (
-              <ActivityRow key={a.id} a={a} />
-            ))}
+            {snapshot.todayActivities
+              .filter((a) => !a.synthetic)
+              .map((a) => (
+                <ActivityRow key={a.id} a={a} />
+              ))}
+            {snapshot.todayActivities
+              .filter((a) => a.synthetic)
+              .map((a) => (
+                <Text key={a.id} style={[styles.muted, { paddingVertical: 6 }]}>
+                  🚶 Other walking today (not a recorded workout): {formatKm(a.distanceM ?? 0)}
+                </Text>
+              ))}
           </Card>
         )}
 

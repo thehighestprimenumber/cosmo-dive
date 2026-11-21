@@ -5,8 +5,10 @@ import { progressOf } from './progress';
 import { DEFAULT_SETTINGS, type Activity } from './types';
 
 const settings = { ...DEFAULT_SETTINGS, startDate: '2026-11-02' };
+let hour = 6;
 function walk(id: string, km: number, up: number | null): Activity {
-  const start = startOfDay('2026-11-21').getTime() + 9 * 3_600_000;
+  hour += 3; // separate outings
+  const start = startOfDay('2026-11-21').getTime() + (hour % 24) * 3_600_000;
   return { id, sport: 'walk', start, end: start + 3_600_000, durationS: 3600, distanceM: km * 1000, ascentM: up, hr: [], origin: 't' };
 }
 

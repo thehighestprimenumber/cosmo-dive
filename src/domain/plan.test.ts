@@ -18,8 +18,8 @@ import { DEFAULT_SETTINGS, type Activity, type DayResult, type Settings } from '
 const settings: Settings = { ...DEFAULT_SETTINGS, startDate: '2026-11-02', onboarded: true };
 const MONDAY = '2026-11-23';
 
-function walk(date: string, km: number, minutes = km * 12, id = date): Activity {
-  const start = startOfDay(date).getTime() + 9 * 3_600_000;
+function walk(date: string, km: number, minutes = km * 12, id = date, hour = 9): Activity {
+  const start = startOfDay(date).getTime() + hour * 3_600_000;
   return { id, sport: 'walk', start, end: start + minutes * 60_000, durationS: minutes * 60, distanceM: km * 1000, hr: [], origin: 't' };
 }
 
@@ -153,8 +153,18 @@ describe('key session targets', () => {
 
   it('long walks count one outing; brisk walks count only walks at the pace', () => {
     const day = '2026-11-28';
-    const acts = [walk(day, 4, 40, 'fast'), walk(day, 5, 70, 'slow')]; // 10:00 and 14:00 min/km
+    const acts = [walk(day, 4, 40, 'fast', 8), walk(day, 5, 70, 'slow', 17)]; // 10:00 and 14:00 min/km, hours apart
     expect(measure({ kind: 'long_walk', meters: 8000 }, acts, settings)).toBe(5000);
     expect(measure({ kind: 'brisk_walk', meters: 3000, paceSPerKm: 660 }, acts, settings)).toBe(4000);
+  });
+
+  it('a walk recorded in two parts (break under 20 min) is one outing', () => {
+    const day = '2026-11-28';
+    const first = walk(day, 7.7, 125, 'part1', 9); // 9:00–11:05
+    const second = { ...walk(day, 5.3, 85, 'part2', 9), start: first.end + 10 * 60_000 }; // 10 min later
+    second.end = second.start + 85 * 60_000;
+    expect(measure({ kind: 'long_walk', meters: 12000 }, [first, second], settings)).toBe(13000);
+    const later = { ...second, start: first.end + 60 * 60_000, end: first.end + 145 * 60_000 }; // 1 h break
+    expect(measure({ kind: 'long_walk', meters: 12000 }, [first, later], settings)).toBe(7700);
   });
 });

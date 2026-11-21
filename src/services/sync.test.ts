@@ -366,5 +366,20 @@ describe('refresh', () => {
       expect(snap.week.elevationKnown).toBe(false);
     });
   });
+
+  it('uses the day’s total distance from Health Connect, not just recorded workouts', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const today = '2026-11-21';
+    const recorded = [{ ...walk(today, 120), distanceM: 7700 }];
+    const daily: Record<string, number> = { [today]: 13970 };
+    for (let i = 1; i <= 13; i++) daily[addDays(today, -i)] = 12000;
+    const source = { ...sourceOf(recorded), getDailyDistance: async () => daily };
+    const snap = await refresh(db, source, { ...settings, startDate: '2026-11-16', dailyTargetKm: 4.3 }, {
+      now: new Date(2026, 10, 21, 16, 0),
+    });
+    expect(snap.aim?.averageKm).toBeCloseTo((13.97 + 13 * 12) / 14, 1);
+    expect(snap.week.doneKm).toBeGreaterThan(60);
+  });
 });
 

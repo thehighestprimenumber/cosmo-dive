@@ -26,6 +26,8 @@ type Report = {
   sessions: RawSession[] | null;
   activities: Activity[];
   baselines: { label: string; value: string }[];
+  /** Total distance per day from Health Connect (what Samsung shows as distance while active). */
+  daily: Record<string, number>;
   sleepAccess: boolean | null;
   nights: Night[];
   error: string | null;
@@ -45,6 +47,7 @@ async function buildReport(db: SQLiteDatabase): Promise<Report> {
     sessions: null,
     activities: [],
     baselines: [],
+    daily: {},
     sleepAccess: null,
     nights: [],
     error: null,
@@ -60,6 +63,7 @@ async function buildReport(db: SQLiteDatabase): Promise<Report> {
       const from = startOfDay(addDays(toDateKey(to), -DAYS));
       if (settings.dataSource === 'health_connect') r.sessions = await listRawSessions(from, to);
       r.activities = await source.getActivities(from, to);
+      r.daily = (await source.getDailyDistance?.(from, to).catch(() => ({}))) ?? {};
 
       r.sleepAccess = (await source.hasSleepAccess?.().catch(() => false)) ?? null;
       if (r.sleepAccess && source.getNights) {
@@ -206,6 +210,32 @@ export default function DiagnosticsScreen() {
               />
               <Text style={styles.hint}>
                 Android decides when it runs. If it never runs, set Daily Spark’s battery usage to Unrestricted.
+              </Text>
+            </Card>
+
+            <Card>
+              <Label>Distance per day (all walking)</Label>
+              {Object.keys(report.daily).length === 0 && (
+                <Text style={styles.muted}>No daily distance from Health Connect.</Text>
+              )}
+              {Object.entries(report.daily)
+                .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+                .slice(0, 14)
+                .map(([d, m]) => {
+                  const recorded = report.activities
+                    .filter((a) => toDateKey(a.start) === d)
+                    .reduce((t, a) => t + (a.distanceM ?? 0), 0);
+                  return (
+                    <Row
+                      key={d}
+                      k={new Date(d + 'T12:00:00').toLocaleDateString([], { weekday: 'short', day: 'numeric' })}
+                      v={`${formatKm(m)} total · ${formatKm(recorded)} in workouts`}
+                    />
+                  );
+                })}
+              <Text style={styles.hint}>
+                The total counts for km goals, your weekly km, the aim and the monthly challenge. Long and brisk walks
+                need a recorded workout.
               </Text>
             </Card>
 

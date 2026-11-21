@@ -44,6 +44,8 @@ export type WeekVolume = {
   notes: string[];
   /** Made early (next week, on Sunday): redone on the week's first sync. */
   provisional?: boolean;
+  /** Rules version it was computed with; older ones are recomputed. */
+  v?: number;
 };
 
 /** Walk-equivalent km per Monday–Sunday week. */
