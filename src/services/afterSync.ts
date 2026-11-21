@@ -2,6 +2,9 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { saveSettings } from '../data/db';
 import type { Settings } from '../domain/types';
 import { ACHIEVEMENTS } from '../domain/game';
+import { widgetStateFrom } from '../widget/state';
+import { saveWidgetState } from '../widget/store';
+import { updateTodayWidget } from '../widget/update';
 import { notifyAchievements, notifyAimReached, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
 import type { Snapshot } from './sync';
 
@@ -17,6 +20,14 @@ export async function afterSync(
   { inBackground }: { inBackground: boolean },
 ): Promise<void> {
   const done = !!snap.todayProgress?.done;
+  // Home-screen widget: save its content (for redraws while closed) and redraw it now.
+  try {
+    const state = widgetStateFrom(snap, settings);
+    await saveWidgetState(db, state);
+    await updateTodayWidget(state);
+  } catch {
+    // A widget problem must never break syncing.
+  }
   // You reached your aim: offer to raise it, once per aim.
   if (inBackground && snap.aim?.suggestion && settings.aimNotifiedKm !== snap.aim.km) {
     await notifyAimReached(snap.aim.averageKm, snap.aim.suggestion);

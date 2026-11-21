@@ -48,4 +48,10 @@ $UI wait "Data source" 30
 alive "opening Diagnostics"
 $UI shot 06-diagnostics
 
+# The home-screen widget preview (same native renderer as the real widget).
+$UI scroll-to "Home-screen widget"
+alive "rendering the widget preview"
+sleep 2
+$UI shot 07-widget-preview
+
 echo "===== WALKTHROUGH PASSED ====="

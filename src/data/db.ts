@@ -61,6 +61,7 @@ export async function loadSettings(db: SQLiteDatabase, today: DateKey): Promise<
   }
   delete stored.restDays;
   delete stored.minDistanceKm;
+  delete stored.widgetState; // stored here too, but it isn't a setting
   return { ...DEFAULT_SETTINGS, startDate: today, ...(stored as Partial<Settings>) };
 }
 

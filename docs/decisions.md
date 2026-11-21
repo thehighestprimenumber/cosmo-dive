@@ -2,6 +2,19 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-21: home-screen widget (before the watch Tile)
+
+The owner wants a phone widget equivalent to a watch Tile first; once it works as wanted, the same content goes to the Galaxy Watch.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Library | `react-native-android-widget` (JSX → RemoteViews, Expo config plugin, headless task handler) | Keeps the widget in TypeScript; supports Expo SDK 54+ |
+| Content | Streak, level, today's goal (emoji + title), progress bar, "X of Y" / done, climb if any, week km done/left, 7 day dots. Tap opens the app | `src/widget/state.ts` (`widgetStateFrom`) is the single source; the watch Tile will reuse it |
+| Size | 4×2 cells (min 250×110 dp), resizable | Fits the goal title and the week row |
+| Updates | After every sync (app open or background task) the state is saved and widgets redrawn; Android also asks every 30 min and the handler redraws the saved state | No sync inside the widget handler: the background task already syncs |
+| Stale day | If the saved state is from an earlier day: "New day! Tap for today's goal" | Avoids showing yesterday's goal |
+| Testing | Diagnostics shows a live preview (same native renderer); the CI walkthrough opens it and fails on a crash | Adding a real widget to a home screen can't be automated on the emulator |
+
 ## 2026-11-21: real numbers (all-day distance, split walks)
 
 From the owner's screenshots: Samsung Health showed 13.97 km for the day and a recorded 13.01 km walk, but the app saw a 7.7 km long walk, a 1.4 km/day average and 19 km for November.

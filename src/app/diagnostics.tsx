@@ -1,7 +1,8 @@
 import { Stack } from 'expo-router';
 import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
+import { WidgetPreview } from 'react-native-android-widget';
 import { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Platform, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { loadSettings } from '../data/db';
 import { addDays, startOfDay, toDateKey } from '../domain/dates';
 import { formatKm, formatMinutes } from '../domain/format';
@@ -13,7 +14,10 @@ import { backgroundSyncStatus } from '../services/backgroundSync';
 import { sourceFor } from '../sources';
 import type { SourceStatus } from '../sources/ActivitySource';
 import { listGrantedPermissions, listRawSessions, type RawSession } from '../sources/healthConnect';
+import { useApp } from '../state/AppState';
 import { Card, Label, styles } from '../ui/components';
+import { widgetStateFrom } from '../widget/state';
+import { TodayWidget } from '../widget/TodayWidget';
 import { colors } from '../ui/theme';
 
 const DAYS = 14;
@@ -200,6 +204,8 @@ export default function DiagnosticsScreen() {
               ))}
             </Card>
 
+            <WidgetCard />
+
             <Card>
               <Label>Background sync</Label>
               <Row k="Available" v={report.background?.available ? 'yes' : 'no'} ok={report.background?.available} />
@@ -294,5 +300,22 @@ function ActivityLine({ a }: { a: Activity }) {
       {a.distanceM != null ? ` · ${formatKm(a.distanceM)}` : ''}
       {a.ascentM != null ? ` · ⛰️ ${Math.round(a.ascentM)} m` : ''} · {a.hr.length} HR samples
     </Text>
+  );
+}
+
+/** The home-screen widget, drawn by the same native renderer as on the home screen. */
+function WidgetCard() {
+  const { snapshot, settings } = useApp();
+  if (!snapshot || !settings || Platform.OS !== 'android') return null;
+  const state = widgetStateFrom(snapshot, settings);
+  return (
+    <Card>
+      <Label>Home-screen widget</Label>
+      <WidgetPreview renderWidget={() => <TodayWidget state={state} />} width={320} height={160} />
+      <Text style={[styles.hint, { marginTop: 8 }]}>
+        To add it: long-press your home screen → Widgets → Daily Spark. It updates after every sync, including
+        background ones.
+      </Text>
+    </Card>
   );
 }
