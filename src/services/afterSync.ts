@@ -1,12 +1,14 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { saveSettings } from '../data/db';
+import { loadCoachRecord, saveSettings } from '../data/db';
 import type { Settings } from '../domain/types';
 import { ACHIEVEMENTS } from '../domain/game';
 import { widgetStateFrom } from '../widget/state';
 import { saveWidgetState } from '../widget/store';
 import { updateTodayWidget } from '../widget/update';
 import { sendStateToWatch } from '../../modules/wear-sync';
-import { notifyAchievements, notifyAimReached, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
+import { shouldAutoReview } from '../domain/coach';
+import { getApiKey, runWeeklyReview } from './coach';
+import { notifyAchievements, notifyCoachReview, notifyAimReached, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
 import type { Snapshot } from './sync';
 
 /**
@@ -39,6 +41,18 @@ export async function afterSync(
   if (inBackground && snap.game.newlyUnlocked.length) {
     const titles = snap.game.newlyUnlocked.map((id) => ACHIEVEMENTS.find((a) => a.id === id)?.title ?? id);
     await notifyAchievements(titles);
+  }
+  // Sunday evening: the coach's weekly review, once (a few retries if it fails).
+  if (inBackground && settings.coachEnabled && snap.nextPlan) {
+    try {
+      const record = await loadCoachRecord(db, snap.nextPlan.week);
+      if (shouldAutoReview(record, Date.now()) && (await getApiKey())) {
+        const r = await runWeeklyReview(db, snap, settings);
+        if (r.ok) await notifyCoachReview(r.review.summary, r.review.proposals.length);
+      }
+    } catch {
+      // The coach is optional; never break syncing.
+    }
   }
   await updateEvening(settings, snap.today, snap.todayGoal, done, snap.streak.current);
   await updateNudge(settings, snap.today, snap.todayGoal, done, snap.usualTime);

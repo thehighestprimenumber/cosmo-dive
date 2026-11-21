@@ -292,6 +292,28 @@ describe('refresh', () => {
       expect(snap.todayNotes.join(' ')).toContain('This week: 24 km');
     });
 
+    it('a lighter week you accepted from the coach survives Monday’s recompute', async () => {
+      const { applyProposal } = await import('../domain/coach');
+      const { loadWeekPlan, saveWeekPlan } = await import('../data/db');
+      const sun = addDays(MON, -1);
+      const run = async (coach: boolean) => {
+        const db = fakeDb();
+        await migrate(db);
+        const evening = await refresh(db, sourceOf(history), { ...s, startDate: '2026-11-09' }, { now: at(sun, 19) });
+        if (coach) {
+          const p = { id: 'p1', action: { type: 'scale_week' as const, factor: 0.8 }, reason: '', change: '', status: 'pending' as const };
+          await saveWeekPlan(db, applyProposal(evening.nextPlan!, p, sun, false)!.plan);
+        }
+        const monday = await refresh(db, sourceOf(history), { ...s, startDate: '2026-11-09' }, { now: at(MON, 9) });
+        return { km: monday.week.volume.km, saved: await loadWeekPlan(db, MON) };
+      };
+      const plain = await run(false);
+      const coached = await run(true);
+      expect(coached.km).toBe(Math.round(plain.km * 0.8 * 2) / 2);
+      expect(coached.saved?.coach).toEqual({ factor: 0.8 });
+      expect(coached.saved?.volume?.provisional).toBeUndefined();
+    });
+
     it('a big day early in the week makes the next days lighter', async () => {
       const db = fakeDb();
       await migrate(db);

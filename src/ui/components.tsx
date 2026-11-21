@@ -56,6 +56,7 @@ export function Field({
   placeholder,
   keyboardType = 'default',
   hint,
+  secure,
 }: {
   label: string;
   value: string;
@@ -63,6 +64,8 @@ export function Field({
   placeholder?: string;
   keyboardType?: 'default' | 'number-pad' | 'decimal-pad' | 'numbers-and-punctuation';
   hint?: string;
+  /** Hide what's typed (passwords, API keys). */
+  secure?: boolean;
 }) {
   return (
     <View style={{ marginBottom: gap }}>
@@ -74,6 +77,9 @@ export function Field({
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
         keyboardType={keyboardType}
+        secureTextEntry={secure}
+        autoCapitalize={secure ? 'none' : undefined}
+        autoCorrect={secure ? false : undefined}
       />
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>

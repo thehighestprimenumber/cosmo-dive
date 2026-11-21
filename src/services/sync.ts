@@ -30,6 +30,7 @@ import {
 } from '../domain/plan';
 import { planVolume, rebalancedDayKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
 import { generateKeySession } from '../domain/sessions';
+import { withCoachFactor } from '../domain/coach';
 import { aimSuggestion, dailyAverageKm, walkingPace } from '../domain/aim';
 import {
   aimMonthTarget,
@@ -80,6 +81,8 @@ export type Snapshot = {
     doneKm: number;
     leftKm: number;
     lastWeekKm: number;
+    /** The 4 weeks before this one, oldest first. */
+    recentWeeksKm: number[];
     /** Zone 2 minutes this week vs. ~35% of the week's walking time; `aerobic` = altitude base phase. */
     zone2: { minutes: number; targetMin: number; aerobic: boolean };
     /** Metres climbed this week, and whether your walks come with elevation at all. */
@@ -209,6 +212,9 @@ export async function refresh(
     });
     return { ...v, v: PLAN_VERSION, ...(provisional ? { provisional: true } : {}) };
   };
+  // A week change you accepted from the coach survives the week's km being recomputed.
+  const coached = async (monday: DateKey, provisional: boolean, factor?: number) =>
+    withCoachFactor(await volumeFor(monday, provisional), factor);
   const trekDaysIn = (monday: DateKey): DateKey[] => {
     const ev = settings.event;
     if (!ev) return [];
@@ -232,7 +238,7 @@ export async function refresh(
   } else if (!plan.volume || plan.volume.provisional || plan.volume.v !== PLAN_VERSION || opts.regenerateToday) {
     // Plans from before weekly volumes, plans made on Sunday for this week, or
     // a changed aim / event: (re)compute this week's km, keeping the days you arranged.
-    plan = { ...plan, volume: await volumeFor(thisMonday, false) };
+    plan = { ...plan, volume: await coached(thisMonday, false, plan.coach?.factor) };
     await saveWeekPlan(db, plan);
   }
   // Missed key sessions slide to the next free day this week.
@@ -463,6 +469,7 @@ export async function refresh(
         doneKm: Math.round(doneKm * 10) / 10,
         leftKm: Math.max(0, Math.round((volume.km - doneKm) * 10) / 10),
         lastWeekKm: Math.round(weekKm(activities, addDays(thisMonday, -7), rf) * 10) / 10,
+        recentWeeksKm: [4, 3, 2, 1].map((w) => Math.round(weekKm(activities, addDays(thisMonday, -7 * w), rf) * 10) / 10),
         zone2: (() => {
           const aerobic = isAerobicPhase(today, settings.event);
           const pace = walkingPace(activities) ?? 0.72;

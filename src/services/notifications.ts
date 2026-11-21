@@ -66,6 +66,17 @@ export async function notifyAimReached(averageKm: number, suggestion: number): P
   });
 }
 
+/** The coach's Sunday review is ready. */
+export async function notifyCoachReview(summary: string, proposals: number): Promise<void> {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: proposals ? `🧠 Your weekly review: ${proposals} suggestion${proposals > 1 ? 's' : ''}` : '🧠 Your weekly review is ready',
+      body: summary.length > 140 ? summary.slice(0, 137) + '…' : summary,
+    },
+    trigger: { channelId: CHANNEL },
+  });
+}
+
 /** New achievements unlocked by a background sync. */
 export async function notifyAchievements(titles: string[]): Promise<void> {
   if (!titles.length) return;

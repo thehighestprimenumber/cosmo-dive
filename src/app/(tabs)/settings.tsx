@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, Switch, Text, View } from 'react-native';
 import { openHealthConnectSettings } from 'react-native-health-connect';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { exportHistory, importHistory } from '../../services/backupFiles';
 import { formatTime, nudgeTime } from '../../domain/habits';
 import { useApp } from '../../state/AppState';
 import type { Settings } from '../../domain/types';
+import { deleteApiKey, getApiKey, setApiKey } from '../../services/coach';
 import { Button, Card, Field, Label, RestPerWeekPicker, styles } from '../../ui/components';
 
 export default function SettingsScreen() {
@@ -137,6 +138,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
           <Button title="Save" onPress={save} />
         </Card>
 
+        <CoachSettings settings={settings} />
+
         <Card>
           <Label>Data</Label>
           <Text style={styles.body}>
@@ -172,5 +175,79 @@ function SettingsForm({ settings }: { settings: Settings }) {
         </Card>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/** AI coach: on/off, the Claude API key (secure storage only) and what it may see. */
+function CoachSettings({ settings }: { settings: Settings }) {
+  const { updateSettings } = useApp();
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [key, setKey] = useState('');
+
+  useEffect(() => {
+    getApiKey().then((k) => setHasKey(!!k));
+  }, []);
+
+  const saveKey = async () => {
+    const k = key.trim();
+    if (!k.startsWith('sk-ant-')) return Alert.alert('That doesn’t look like a Claude API key (they start with sk-ant-).');
+    await setApiKey(k);
+    setKey('');
+    setHasKey(true);
+    if (!settings.coachEnabled) await updateSettings({ coachEnabled: true });
+  };
+
+  const removeKey = () =>
+    Alert.alert('Remove the API key?', 'The weekly review stops until you add one again.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteApiKey();
+          setHasKey(false);
+        },
+      },
+    ]);
+
+  return (
+    <Card>
+      <Label>🧠 AI coach</Label>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={styles.body}>Weekly review on Sunday evening</Text>
+        <Switch value={settings.coachEnabled} onValueChange={(v) => void updateSettings({ coachEnabled: v })} />
+      </View>
+      <Text style={[styles.hint, { marginBottom: 8 }]}>
+        Claude reviews your week and suggests up to two changes to next week (move a key session, or fewer or a few
+        more km). The plan’s safety rules check them, and nothing changes unless you tap Apply. It sends a summary of
+        this week and next week’s plan: goals, km, which days you walked, how rested you were. No raw workouts or
+        heart rate. Costs a few cents a month on your Anthropic account.
+      </Text>
+      {hasKey ? (
+        <>
+          <Text style={[styles.body, { marginBottom: 4 }]}>✓ Claude API key saved (encrypted, on this phone only)</Text>
+          <Button title="Remove API key" variant="secondary" onPress={removeKey} />
+        </>
+      ) : (
+        <>
+          <Field
+            label="Claude API key"
+            value={key}
+            onChangeText={setKey}
+            placeholder="sk-ant-…"
+            secure
+            hint="Create one at console.anthropic.com → API keys. It's stored encrypted on this phone, never in backups."
+          />
+          <Button title="Save API key" onPress={saveKey} disabled={!key.trim()} />
+        </>
+      )}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+        <Text style={[styles.body, { flex: 1 }]}>Share my cycle with the coach</Text>
+        <Switch value={settings.coachShareCycle} onValueChange={(v) => void updateSettings({ coachShareCycle: v })} />
+      </View>
+      <Text style={styles.hint}>
+        Off: the coach only sees “light week”. On: it also sees that it’s for your period and when the next one is due.
+      </Text>
+    </Card>
   );
 }

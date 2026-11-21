@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import type { CoachRecord } from '../domain/coach';
 import type { WeekPlan } from '../domain/plan';
 import { DEFAULT_SETTINGS, type DailyGoal, type DateKey, type DayResult, type GoalMeta, type GoalSpec, type Settings } from '../domain/types';
 
@@ -32,6 +33,12 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE goals ADD COLUMN meta TEXT;`,
   // v3: weekly plans (which day each key session is on).
   `CREATE TABLE week_plans (
+     week TEXT PRIMARY KEY NOT NULL,
+     data TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   );`,
+  // v4: the AI coach's weekly reviews (and failed attempts).
+  `CREATE TABLE coach_reviews (
      week TEXT PRIMARY KEY NOT NULL,
      data TEXT NOT NULL,
      updated_at TEXT NOT NULL
@@ -165,6 +172,22 @@ export async function saveWeekPlan(db: SQLiteDatabase, plan: WeekPlan): Promise<
     'INSERT OR REPLACE INTO week_plans (week, data, updated_at) VALUES (?, ?, ?)',
     plan.week,
     JSON.stringify(plan),
+    new Date().toISOString(),
+  );
+}
+
+// ---- coach reviews ----
+
+export async function loadCoachRecord(db: SQLiteDatabase, week: DateKey): Promise<CoachRecord | null> {
+  const row = await db.getFirstAsync<{ data: string }>('SELECT data FROM coach_reviews WHERE week = ?', week);
+  return row ? (JSON.parse(row.data) as CoachRecord) : null;
+}
+
+export async function saveCoachRecord(db: SQLiteDatabase, week: DateKey, record: CoachRecord): Promise<void> {
+  await db.runAsync(
+    'INSERT OR REPLACE INTO coach_reviews (week, data, updated_at) VALUES (?, ?, ?)',
+    week,
+    JSON.stringify(record),
     new Date().toISOString(),
   );
 }

@@ -148,6 +148,10 @@ export type Settings = {
   monthTargets: Record<string, number>;
   /** Unlocked achievements → date unlocked. Never removed. */
   achievements: Record<string, DateKey>;
+  /** AI coach: a weekly review on Sunday evening (needs a Claude API key, kept in secure storage). */
+  coachEnabled: boolean;
+  /** Tell the coach that a light week is for your period, and when the next one is due. Off by default. */
+  coachShareCycle: boolean;
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -169,6 +173,8 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   lastBackgroundSync: null,
   monthTargets: {},
   achievements: {},
+  coachEnabled: false,
+  coachShareCycle: false,
 };
 
 export type Progress = {

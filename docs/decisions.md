@@ -2,6 +2,23 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-21: AI coach, step 1: the Sunday review
+
+The owner agreed: the AI only *proposes*, as concrete changes the plan's rules check, and nothing changes until they tap Apply. First step: the weekly review on Sunday evening; a chat comes later.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| What it can propose | Up to 2 per week: **move a key session** of next week to a free day, or **scale next week's km** (one per week). Plus a summary of the week and one tip | The same changes you can make by hand. Rest days, aim and the trek goal stay your decisions: changing rest days would also re-judge past days. `CoachAction` in `src/domain/coach.ts` |
+| Safety rules | Lighter: down to 60% at most. Harder: never in a light, pre-event or event week, and never past +10% of what you actually walked this week (usually that leaves no room, since the plan already grows). Changes under ±3% are dropped. Invalid ideas (taken day, trek day, other week) are dropped silently; a capped one says so ("⚖️ Capped at …") | `checkAction` |
+| Applying | Apply / Not now per suggestion; Undo afterwards (moves back if that day is still free, km restored). A week change you applied **survives Monday's recompute** (stored as `plan.coach.factor`) | `applyProposal` / `undoProposal` / `withCoachFactor` |
+| When | In the background, once next week's plan appears (Sunday from 18:00), with a notification "🧠 Your weekly review…"; or with "Get my weekly review" on the Week tab. A failed try is retried up to 3 times, 2 hours apart | `shouldAutoReview` |
+| What it sees | A summary: this week's days (goal, result, done, key session, how rested you were), km this week and the 4 before, next week's plan (km, type, sessions, free days, the most it may grow to), streak, rest days, aim, trek goal. **No** raw workouts, heart rate or sleep times | `buildReviewInput` |
+| Your cycle | Off by default: the coach only sees "light week". With **Share my cycle with the coach** on, it also sees that it's for your period and the next predicted start | Settings → AI coach |
+| Model | Claude Opus 5.5 at medium effort, JSON answer checked against a schema. The server-side fallback is on: if the model declines, another model answers in the same call | `src/services/coach.ts`. About 2–4 US cents per review |
+| API key | Your own Anthropic key, in Android's encrypted storage (expo-secure-store). Not in the database, not in backups. No server | Settings → AI coach |
+| Language | The coach writes in Rioplatense Spanish (voseo), gender-neutral; the rest of the app stays English | Change the prompt in `src/services/coach.ts` |
+| App start | The Claude SDK loads only when the coach runs | So the coach can never break or slow app start |
+
 ## 2026-11-21: watch Tile (Galaxy Watch5 Pro, Wear OS)
 
 | Topic | Decision | Why / how to change |

@@ -8,6 +8,7 @@ import type { DateKey, GoalEvent } from '../../domain/types';
 import { sourceFor } from '../../sources';
 import { useApp } from '../../state/AppState';
 import { Button, Card, Field, Label, ProgressBar, styles } from '../../ui/components';
+import { CoachCard } from '../../ui/CoachCard';
 import { colors, STATUS_COLOR } from '../../ui/theme';
 
 const SESSION_LABEL: Record<SessionKind, string> = {
@@ -31,6 +32,8 @@ export default function WeekScreen() {
 
         <VolumeCard />
         <WeekList plan={snapshot.plan} />
+
+        <CoachCard />
 
         {snapshot.nextPlan ? (
           <>

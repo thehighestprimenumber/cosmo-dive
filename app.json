@@ -64,7 +64,8 @@
             }
           ]
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

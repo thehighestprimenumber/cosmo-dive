@@ -28,6 +28,8 @@ export type WeekPlan = {
   sessions: KeySession[];
   /** How many km this week and why (weekly-volume plans, v7+). */
   volume?: WeekVolume;
+  /** Changes you accepted from the AI coach's Sunday review (kept when the week's km is recomputed). */
+  coach?: { factor: number };
 };
 
 /** The goal type a session is measured as. */
