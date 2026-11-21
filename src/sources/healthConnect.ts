@@ -34,6 +34,8 @@ const PERMISSIONS = [
   { accessType: 'read' as const, recordType: 'ReadHealthDataHistory' as const },
   // Lets the background sync read activities while the app is closed.
   { accessType: 'read' as const, recordType: 'BackgroundAccessPermission' as const },
+  // Optional: elevation makes long walks hill training (for treks with a climb).
+  { accessType: 'read' as const, recordType: 'ElevationGained' as const },
   // Optional: sleep makes goals readiness-aware.
   { accessType: 'read' as const, recordType: 'SleepSession' as const },
 ];
@@ -177,6 +179,14 @@ export const healthConnectSource: ActivitySource = {
           dataOriginFilter: origin === 'unknown' ? undefined : [origin],
         });
         const distanceM = dist.DISTANCE?.inMeters ?? 0;
+        // Climb from the same app; null when not shared/permitted (not the same as a flat 0 m walk).
+        const ascentM = await aggregateRecord({
+          recordType: 'ElevationGained',
+          timeRangeFilter: between(start, end),
+          dataOriginFilter: origin === 'unknown' ? undefined : [origin],
+        })
+          .then((r) => (r.dataOrigins?.length ? r.ELEVATION_GAINED_TOTAL?.inMeters ?? 0 : null))
+          .catch(() => null);
 
         const hrRecords = await readAll('HeartRate', start, end);
         const seen = new Set<number>();
@@ -199,6 +209,7 @@ export const healthConnectSource: ActivitySource = {
           end: end.getTime(),
           durationS: (end.getTime() - start.getTime()) / 1000,
           distanceM: distanceM > 0 ? distanceM : null,
+          ascentM,
           hr,
           origin,
         };

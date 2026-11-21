@@ -11,6 +11,7 @@ import {
   saveWeekPlan,
 } from '../data/db';
 import { cycleInfo, isPeriodWeek, nextPeriod, type Period } from '../domain/cycle';
+import { hasElevationData, longWalkClimb, typicalClimbPerKm } from '../domain/elevation';
 import {
   dropSession,
   forwardMissed,
@@ -77,6 +78,9 @@ export type Snapshot = {
     doneKm: number;
     leftKm: number;
     lastWeekKm: number;
+    /** Metres climbed this week, and whether your walks come with elevation at all. */
+    climbM: number;
+    elevationKnown: boolean;
   };
   /** Your cycle, if known (period records or "started today" taps). */
   cycle: { cycleDays: number; source: 'history' | 'settings'; next: Period | null } | null;
@@ -259,6 +263,13 @@ export async function refresh(
       settings.event,
     );
   };
+  // Climb targets only when your watch's walks come with elevation (otherwise they couldn't be met).
+  const elevationKnown = hasElevationData(activities);
+  const usualClimb = typicalClimbPerKm(activities);
+  const keyClimb = (x: KeySession, km: number): number | null => {
+    if (!elevationKnown || !settings.event?.ascentM || x.kind === 'brisk_walk') return null;
+    return x.kind === 'trek_day' ? settings.event.ascentM : longWalkClimb(km, settings.event, usualClimb);
+  };
   const keyKm = (x: KeySession, split: ReturnType<typeof splitOf>) =>
     x.kind === 'long_walk'
       ? split.longKm
@@ -312,6 +323,7 @@ export async function refresh(
             history,
             readiness,
             targetKm: keyKm(key, split),
+            ascentM: keyClimb(key, keyKm(key, split)),
             light: !!volume.light,
             weekNotes: volume.notes,
           });
@@ -441,6 +453,12 @@ export async function refresh(
         doneKm: Math.round(doneKm * 10) / 10,
         leftKm: Math.max(0, Math.round((volume.km - doneKm) * 10) / 10),
         lastWeekKm: Math.round(weekKm(activities, addDays(thisMonday, -7), rf) * 10) / 10,
+        climbM: Math.round(
+          activities
+            .filter((a) => toDateKey(a.start) >= thisMonday && toDateKey(a.start) <= today)
+            .reduce((t, a) => t + (a.ascentM ?? 0), 0),
+        ),
+        elevationKnown,
       };
     })(),
     cycle: cycle
@@ -459,6 +477,7 @@ export async function refresh(
             activities,
             history,
             targetKm: keyKm(x, splitOf(x.day >= nextMonday && nextPlan ? nextPlan : plan)),
+            ascentM: keyClimb(x, keyKm(x, splitOf(x.day >= nextMonday && nextPlan ? nextPlan : plan))),
           }).goal,
         ]),
     ),

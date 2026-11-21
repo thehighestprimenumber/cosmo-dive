@@ -327,5 +327,44 @@ describe('refresh', () => {
       expect(snap.week.volume.eventWeek).toBe(true);
     });
   });
+
+  describe('climb', () => {
+    const MON = '2026-11-23';
+    const at = (day: string, hour: number) => {
+      const d = startOfDay(day);
+      d.setHours(hour);
+      return d;
+    };
+    const event = { name: 'Sierra Norte', km: 15, date: '2027-07-10', days: 3, ascentM: 900 };
+    const s = { ...settings, startDate: '2026-11-16', event };
+    const plan = {
+      week: MON,
+      sessions: [{ id: 'long', kind: 'long_walk' as const, day: MON, plannedDay: MON }],
+    };
+    const weeks = (up: number | null) =>
+      Array.from({ length: 21 }, (_, i) => ({ ...walk(addDays(MON, -21 + i), 60), distanceM: 5000, ascentM: up }));
+
+    it('long walks get a climb target when your walks have elevation', async () => {
+      const { saveWeekPlan } = await import('../data/db');
+      const db = fakeDb();
+      await migrate(db);
+      await saveWeekPlan(db, plan);
+      const snap = await refresh(db, sourceOf(weeks(50)), s, { now: at(MON, 9) });
+      const goal = snap.todayGoal as { kind: string; ascentM?: number };
+      expect(goal.kind).toBe('long_walk');
+      expect(goal.ascentM).toBeGreaterThan(0);
+      expect(snap.week.elevationKnown).toBe(true);
+    });
+
+    it('…and none without elevation data, so the goal can still be met', async () => {
+      const { saveWeekPlan } = await import('../data/db');
+      const db = fakeDb();
+      await migrate(db);
+      await saveWeekPlan(db, plan);
+      const snap = await refresh(db, sourceOf(weeks(null)), s, { now: at(MON, 9) });
+      expect((snap.todayGoal as { ascentM?: number }).ascentM).toBeUndefined();
+      expect(snap.week.elevationKnown).toBe(false);
+    });
+  });
 });
 

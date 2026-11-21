@@ -88,7 +88,14 @@ function VolumeCard() {
       <ProgressBar fraction={volume.km ? Math.min(1, doneKm / volume.km) : 0} done={leftKm === 0} />
       <Text style={styles.body}>
         {doneKm} km done · {leftKm} km left
+        {snapshot.week.elevationKnown ? ` · ⛰️ ${snapshot.week.climbM} m climbed` : ''}
       </Text>
+      {ev?.ascentM && !snapshot.week.elevationKnown ? (
+        <Text style={[styles.hint, { color: colors.pending }]}>
+          No elevation from your watch yet, so long walks don’t have a climb target. Check Diagnostics, and that Samsung
+          Health shares elevation with Health Connect.
+        </Text>
+      ) : null}
       <Text style={[styles.hint, { marginTop: 4 }]}>
         Heading to {volume.destinationKm} km a week, at most +10% a week. Days adapt to what you’ve done: do more
         today and the rest of the week gets lighter.
@@ -134,6 +141,7 @@ function WeekList({ plan }: { plan: WeekPlan }) {
                     {SESSION_LABEL[session.kind]}
                     {session.kind === 'trek_day' ? ` ${trekIndex(session)}` : ''}
                     {goal && 'meters' in goal ? ` · ${isFuture ? 'about ' : ''}${formatValue(goal, goal.meters)}` : ''}
+                    {goal && goal.kind === 'long_walk' && goal.ascentM ? `, ⛰️ ${goal.ascentM} m` : ''}
                   </Text>
                 ) : goal && !isFuture ? (
                   <Text style={styles.muted}>
@@ -191,6 +199,7 @@ function EventCard() {
   const [km, setKm] = useState(settings?.event ? String(settings.event.km) : '');
   const [days, setDays] = useState(settings?.event?.days ? String(settings.event.days) : '1');
   const [date, setDate] = useState(settings?.event?.date ?? '');
+  const [climb, setClimb] = useState(settings?.event?.ascentM ? String(settings.event.ascentM) : '');
   if (!settings || !snapshot) return null;
   const ev = settings.event;
 
@@ -203,7 +212,9 @@ function EventCard() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date <= snapshot.today) {
       return Alert.alert('Date should look like 2027-07-10 and be in the future.');
     }
-    const event: GoalEvent = { name: name.trim(), km: k, date, days: n };
+    const up = climb.trim() ? Number(climb) : 0;
+    if (!(up >= 0 && up <= 3000)) return Alert.alert('Climb per day should be 0–3000 m, or empty.');
+    const event: GoalEvent = { name: name.trim(), km: k, date, days: n, ...(up ? { ascentM: up } : {}) };
     await updateSettings({ event });
     setEditing(false);
     await refresh({ regenerateToday: true });
@@ -217,6 +228,7 @@ function EventCard() {
         <Label>🎯 Goal with a date</Label>
         <Text style={styles.h2}>
           {ev.name}: {multi ? `${ev.days} days × ${ev.km} km` : `${ev.km} km`}
+          {ev.ascentM ? `, ⛰️ ${ev.ascentM} m up a day` : ''}
         </Text>
         <Text style={styles.muted}>
           {until <= 0 ? 'It’s on! You’ve trained for this.' : `Starts ${ev.date} · in ${until} days (${Math.round(until / 7)} weeks)`}.
@@ -267,6 +279,14 @@ function EventCard() {
         hint="For a multi-day trek, the longest day’s distance."
       />
       <Field label="Days in a row" value={days} onChangeText={setDays} keyboardType="number-pad" placeholder="1" />
+      <Field
+        label="Climb per day (m, optional)"
+        value={climb}
+        onChangeText={setClimb}
+        keyboardType="number-pad"
+        placeholder="900"
+        hint="Metres up on the hardest day. Long walks then become hill walks that build up to it."
+      />
       <Field
         label="First day"
         value={date}

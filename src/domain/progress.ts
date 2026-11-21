@@ -34,8 +34,8 @@ export function measure(
     case 'hr_zone':
       return activities.reduce((s, a) => s + secondsInZone(a.hr, goal.zone, settings.maxHr), 0);
     case 'long_walk':
-      // One outing, not several added up.
-      return Math.max(0, ...activities.filter((a) => a.sport === 'walk').map((a) => a.distanceM ?? 0));
+      // One outing, not several added up (with a climb target, that same outing's climb).
+      return bestLongWalk(goal, activities).value;
     case 'brisk_walk':
       return activities
         .filter((a) => a.sport === 'walk' && (a.distanceM ?? 0) >= 1000)
@@ -51,7 +51,31 @@ export function progressOf(
 ): Progress {
   const value = measure(goal, activities, settings);
   const target = goalTarget(goal);
-  return { value, target, fraction: Math.min(1, value / target), done: value >= target };
+  const p: Progress = { value, target, fraction: Math.min(1, value / target), done: value >= target };
+  if (goal.kind === 'long_walk' && goal.ascentM) {
+    p.ascent = { value: bestLongWalk(goal, activities).ascent, target: goal.ascentM };
+  }
+  return p;
+}
+
+/**
+ * The walk that gets furthest toward a long walk goal. With a climb target,
+ * an outing counts as far as its weaker side: 12 km with half the climb is
+ * half done. `value` is in metres of the goal's distance.
+ */
+function bestLongWalk(
+  goal: Extract<GoalSpec, { kind: 'long_walk' }>,
+  activities: Activity[],
+): { value: number; ascent: number } {
+  let best = { value: 0, ascent: 0 };
+  for (const a of activities) {
+    if (a.sport !== 'walk') continue;
+    const d = a.distanceM ?? 0;
+    const up = a.ascentM ?? 0;
+    const value = goal.ascentM ? Math.min(d, (up / goal.ascentM) * goal.meters) : d;
+    if (value > best.value) best = { value, ascent: up };
+  }
+  return best;
 }
 
 export function activitiesOn(date: DateKey, activities: Activity[]): Activity[] {

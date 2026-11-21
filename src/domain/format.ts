@@ -29,7 +29,9 @@ export function goalTitle(goal: GoalSpec, settings: Pick<Settings, 'rideFactor'>
     case 'hr_zone':
       return `${formatMinutes(goal.seconds)} in Zone ${goal.zone}`;
     case 'long_walk':
-      return `Long walk: ${formatKm(goal.meters)} in one go`;
+      return goal.ascentM
+        ? `Long walk: ${formatKm(goal.meters)} with ${goal.ascentM} m of climb`
+        : `Long walk: ${formatKm(goal.meters)} in one go`;
     case 'brisk_walk':
       return `Brisk walk: ${formatKm(goal.meters)} at ${formatPace(goal.paceSPerKm)} or faster`;
   }

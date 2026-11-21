@@ -21,6 +21,8 @@ export type KeySessionInput = {
   history: DayResult[];
   /** This session's share of the week, in km (from the weekly-volume plan). */
   targetKm: number;
+  /** Long walks / trek days: metres to climb in that same outing (event with a climb). */
+  ascentM?: number | null;
   /** Light week: no pace push on the brisk walk. */
   light?: boolean;
   /** Why this week has the km it has (shown with the goal). */
@@ -37,7 +39,7 @@ const LABEL: Record<SessionKind, string> = {
 
 /** A key session's target: its share of the week's km; the brisk walk also gets a pace. */
 export function generateKeySession(input: KeySessionInput): DailyGoal {
-  const { date, kind, settings, activities, history, targetKm, light, weekNotes = [], readiness } = input;
+  const { date, kind, settings, activities, history, targetKm, ascentM, light, weekNotes = [], readiness } = input;
   const notes: string[] = [`${LABEL[kind]}: ${formatKm(targetKm * 1000)} of the week’s plan.`, ...weekNotes];
   let factor = 1;
   let pace: number | undefined;
@@ -73,6 +75,13 @@ export function generateKeySession(input: KeySessionInput): DailyGoal {
   } else {
     spec = { kind: 'long_walk', meters: 0 };
     if (kind === 'trek_day') notes.unshift(`🏔️ ${settings.event?.name ?? 'Your trek'}: enjoy it, you trained for this!`);
+    if (ascentM) {
+      notes.push(
+        kind === 'trek_day'
+          ? `⛰️ ${ascentM} m of climbing today.`
+          : `⛰️ Climb ${ascentM} m in the same walk: hills toward the trek’s ${settings.event?.ascentM} m a day.`,
+      );
+    }
   }
 
   // Trek days are the real thing: no readiness tweak.
@@ -81,7 +90,8 @@ export function generateKeySession(input: KeySessionInput): DailyGoal {
     notes.push(...readiness.notes);
   }
   const meters = Math.min(MAX_M, Math.max(MIN_M, roundTo(targetKm * 1000 * factor, 100)));
-  const goal = { ...spec, meters } as GoalSpec;
+  const climb = ascentM && spec.kind === 'long_walk' ? roundTo(ascentM * factor, 10) : 0;
+  const goal = { ...spec, meters, ...(climb ? { ascentM: climb } : {}) } as GoalSpec;
 
   return {
     date,

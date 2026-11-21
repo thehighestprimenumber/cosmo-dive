@@ -33,6 +33,8 @@ export type Activity = {
   origin: string;
   /** Exercise type as recorded, e.g. "paddling". */
   label?: string;
+  /** Metres climbed during it, when the watch/app records elevation. */
+  ascentM?: number | null;
 };
 
 export type HrZone = 1 | 2 | 3 | 4 | 5;
@@ -46,8 +48,8 @@ export type GoalSpec =
   | { kind: 'distance'; meters: number; suggestedSport: DistanceSport }
   | { kind: 'duration'; seconds: number }
   | { kind: 'hr_zone'; zone: HrZone; seconds: number }
-  /** Key session: one walk (or hike/run) of at least this distance. */
-  | { kind: 'long_walk'; meters: number }
+  /** Key session: one walk (or hike/run) of at least this distance, and this much climb if set. */
+  | { kind: 'long_walk'; meters: number; ascentM?: number }
   /** Key session: walking distance at this pace or faster (seconds per km). */
   | { kind: 'brisk_walk'; meters: number; paceSPerKm: number };
 
@@ -82,7 +84,7 @@ export type GoalMeta = {
  * A dated goal the plan builds toward, e.g. a 15 km hike on 31 Dec, or a
  * multi-day trek: `km` per day for `days` days in a row from `date`.
  */
-export type GoalEvent = { name: string; km: number; date: DateKey; days?: number };
+export type GoalEvent = { name: string; km: number; date: DateKey; days?: number; ascentM?: number };
 
 /**
  * Stored once per day and never rewritten (except today's, see sync.ts).
@@ -164,6 +166,8 @@ export type Progress = {
   target: number;
   fraction: number;
   done: boolean;
+  /** Long walks with a climb target: metres climbed in that walk vs. the target. */
+  ascent?: { value: number; target: number };
 };
 
 /** A day's goal plus how much of it was achieved. */

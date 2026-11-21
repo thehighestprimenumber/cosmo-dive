@@ -42,6 +42,7 @@ export const demoSource: ActivitySource = {
         end,
         durationS: (end - start) / 1000,
         distanceM: ((end - start) / 1000) * speed,
+        ascentM: sport === 'walk' ? Math.round((((end - start) / 1000) * speed * rand(d + 'up') * 30) / 1000) : null,
         hr,
         origin: 'demo',
       });

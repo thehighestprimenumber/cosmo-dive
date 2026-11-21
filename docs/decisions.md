@@ -2,6 +2,18 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-21: climb (elevation gain)
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Data | Health Connect ElevationGained per walk, from the same app as the session (optional permission). No data shows as "unknown", never as 0 m | `src/sources/healthConnect.ts` |
+| Goal | Optional "climb per day (m)" on the dated goal (the hardest day) | Week → 🎯 |
+| Long walks | Long walk and back-to-back day get a climb target in the **same walk**: metres per km move from your usual (median of your walks) toward the trek's, as the long walk's distance approaches the trek's. Unknown usual → half the trek's | `longWalkClimb` in `src/domain/elevation.ts` |
+| Trek days | The full daily climb | |
+| Counting | An outing counts as far as its weaker side (12 km with half the climb = half done) | `bestLongWalk` in `progress.ts` |
+| No elevation data | No climb targets (so goals stay achievable); the Week tab says why | |
+| Readiness | Also scales the climb (not on trek days) | |
+
 ## 2026-11-21: one weekly-volume engine, period-aware light weeks, multi-day treks
 
 The owner asked to merge the two planning mechanisms (recent activity vs. dated goal), to have the light week during her period, and to support her goal: **multi-day village-to-village treks in Oaxaca's Sierra Norte** in the Argentine winter (Jun–Aug 2027).
@@ -21,7 +33,7 @@ The owner asked to merge the two planning mechanisms (recent activity vs. dated 
 | Mid-week rebalancing | A regular day's km = (week km − done so far − key sessions still ahead) / (days left − key days left − rest days left), kept within 70–130% of the plan. Set when the day's goal is made, in the morning | Big kayak day → lighter days after |
 | Time and heart-rate goals | Converted from the day's km with your walking pace (time) and half that time in the zone (heart rate) | Everything adds up to the week |
 | Removed | The "lighter after a big day" tweak and the 80–150% clamp around your typical day (the weekly engine covers both); the fixed every-4th recovery week when cycle data exists | |
-| Not trained yet | **Elevation gain** (Sierra Norte is mountainous) and altitude. Possible next step: Health Connect ElevationGained for hill goals | |
+| Not trained | Altitude (can't be trained from the app). Elevation gain: added the same day, see below | |
 | Rules version | `PLAN_VERSION` 7 | |
 
 ## 2026-11-20: weekly plan (Runna-style)

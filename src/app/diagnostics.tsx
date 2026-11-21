@@ -5,6 +5,7 @@ import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { loadSettings } from '../data/db';
 import { addDays, startOfDay, toDateKey } from '../domain/dates';
 import { formatKm, formatMinutes } from '../domain/format';
+import { hasElevationData, typicalClimbPerKm } from '../domain/elevation';
 import { baselineFor, LOOKBACK_DAYS } from '../domain/generator';
 import type { Night } from '../domain/readiness';
 import type { Activity, RegularGoalSpec, Settings } from '../domain/types';
@@ -73,6 +74,11 @@ async function buildReport(db: SQLiteDatabase): Promise<Report> {
         { kind: 'duration', seconds: 0 },
         { kind: 'hr_zone', zone: 2, seconds: 0 },
       ];
+      const climb = typicalClimbPerKm(recent);
+      r.baselines.push({
+        label: 'Climb per km (walks)',
+        value: climb != null ? `${Math.round(climb)} m/km` : hasElevationData(recent) ? 'not enough data' : 'no elevation data',
+      });
       for (const spec of specs) {
         const t = baselineFor(spec, recent, settings);
         r.baselines.push({
@@ -222,6 +228,7 @@ export default function DiagnosticsScreen() {
                     <Text style={styles.muted}>
                       {formatMinutes((s.end - s.start) / 1000)}
                       {a?.distanceM != null ? ` · ${formatKm(a.distanceM)}` : ''}
+                      {a?.ascentM != null ? ` · ⛰️ ${Math.round(a.ascentM)} m` : ''}
                       {a ? ` · ${a.hr.length} heart rate samples` : ''}
                       {!a ? ' · duplicate, ignored' : ''}
                     </Text>
@@ -254,7 +261,8 @@ function ActivityLine({ a }: { a: Activity }) {
   return (
     <Text style={[styles.muted, { paddingVertical: 4 }]}>
       {a.sport === 'walk' ? '🚶' : a.sport === 'ride' ? '🚴' : '🏅'} {fmtTime(a.start)} · {formatMinutes(a.durationS)}
-      {a.distanceM != null ? ` · ${formatKm(a.distanceM)}` : ''} · {a.hr.length} HR samples
+      {a.distanceM != null ? ` · ${formatKm(a.distanceM)}` : ''}
+      {a.ascentM != null ? ` · ⛰️ ${Math.round(a.ascentM)} m` : ''} · {a.hr.length} HR samples
     </Text>
   );
 }

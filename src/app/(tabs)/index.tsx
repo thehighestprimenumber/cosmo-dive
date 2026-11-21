@@ -149,6 +149,11 @@ export default function TodayScreen() {
                 ? `Goal complete! 🎉 ${formatValue(goal, progress.value)}`
                 : `${formatValue(goal, progress.value)} of ${formatValue(goal, progress.target)}`}
             </Text>
+            {progress.ascent && (
+              <Text style={styles.body}>
+                ⛰️ {Math.round(progress.ascent.value)} of {progress.ascent.target} m climbed (in the same walk)
+              </Text>
+            )}
             {!done && streak && (
               <Text style={[styles.hint, { marginTop: 8 }]}>
                 {streak.restLeftThisWeek > 0
