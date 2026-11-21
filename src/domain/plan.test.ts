@@ -158,13 +158,21 @@ describe('key session targets', () => {
     expect(measure({ kind: 'brisk_walk', meters: 3000, paceSPerKm: 660 }, acts, settings)).toBe(4000);
   });
 
-  it('a walk recorded in two parts (break under 20 min) is one outing', () => {
-    const day = '2026-11-28';
-    const first = walk(day, 7.7, 125, 'part1', 9); // 9:00–11:05
-    const second = { ...walk(day, 5.3, 85, 'part2', 9), start: first.end + 10 * 60_000 }; // 10 min later
-    second.end = second.start + 85 * 60_000;
-    expect(measure({ kind: 'long_walk', meters: 12000 }, [first, second], settings)).toBe(13000);
-    const later = { ...second, start: first.end + 60 * 60_000, end: first.end + 145 * 60_000 }; // 1 h break
-    expect(measure({ kind: 'long_walk', meters: 12000 }, [first, later], settings)).toBe(7700);
+  it('a walk Samsung split into parts (breaks up to 30 min) is one outing', () => {
+    // The owner's real 21 Nov walk: 3.4 + 1.7 + 0.5 + 7.7 km with 21, 24 and 19 min breaks.
+    const day = '2026-11-21';
+    const at = (h: number, m: number) => startOfDay(day).getTime() + (h * 60 + m) * 60_000;
+    const part = (id: string, h: number, m: number, minutes: number, km: number): Activity => ({
+      ...walk(day, km, minutes, id),
+      start: at(h, m),
+      end: at(h, m) + minutes * 60_000,
+    });
+    const parts = [part('a', 9, 27, 67, 3.4), part('b', 10, 55, 35, 1.7), part('c', 11, 54, 11, 0.5), part('d', 12, 24, 150, 7.7)];
+    expect(measure({ kind: 'long_walk', meters: 12000 }, parts, settings)).toBeCloseTo(13300);
+    // A walk later in the afternoon, after a long break, is a separate outing.
+    const later = part('e', 16, 21, 8, 0.4);
+    expect(measure({ kind: 'long_walk', meters: 12000 }, [...parts, later], settings)).toBeCloseTo(13300);
+    const separate = [part('x', 8, 0, 60, 5), part('y', 10, 0, 60, 6)]; // 1 h break
+    expect(measure({ kind: 'long_walk', meters: 12000 }, separate, settings)).toBe(6000);
   });
 });

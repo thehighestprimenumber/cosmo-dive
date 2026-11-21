@@ -58,10 +58,15 @@ export function progressOf(
   return p;
 }
 
-/** Sessions this close together are one outing (a break, or a recording split in two). */
-export const OUTING_GAP_MS = 20 * 60_000;
+/**
+ * Sessions this close together are one outing. Samsung Health can hand a
+ * single long walk to Health Connect in several parts (a 13 km walk arrived
+ * as 3.4 + 1.7 + 0.5 + 7.7 km with 19–24 min gaps); a meal or rest stop on a
+ * trek doesn't end the walk either.
+ */
+export const OUTING_GAP_MS = 30 * 60_000;
 
-/** Recorded walks grouped into outings: consecutive walks with breaks under 20 minutes. */
+/** Recorded walks grouped into outings: consecutive walks with breaks of up to 30 minutes. */
 export function outings(activities: Activity[]): { distanceM: number; ascentM: number; start: number; end: number }[] {
   const walks = activities.filter((a) => a.sport === 'walk' && !a.synthetic).sort((a, b) => a.start - b.start);
   const out: { distanceM: number; ascentM: number; start: number; end: number }[] = [];

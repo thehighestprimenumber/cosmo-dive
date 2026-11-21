@@ -13,10 +13,10 @@ From the owner's screenshots: Samsung Health showed 13.97 km for the day and a r
 | Where it doesn't | Long walk, brisk walk, climb, walking pace, usual start time, time and heart-rate goals | Those need a real recorded outing / duration |
 | Active day | A day counts for your typical day with 15+ min of exercise **or 1.5+ km of walking** | All-day distance has no duration |
 | Session distance | max(distance from the session's own app, distance from all apps) in its time window | Watch and phone can write a workout's distance under different origins |
-| Split recordings | Recorded walks less than 20 min apart are one outing for the long walk (distance and climb add up) | A break or a recording split in two is still one walk |
+| Split recordings | Recorded walks **up to 30 min** apart are one outing for the long walk (distance and climb add up) | Confirmed from the owner's data: a 13 km Samsung workout reached Health Connect as 3.4 + 1.7 + 0.5 + 7.7 km with 19–24 min gaps. 30 min also covers a meal stop on a trek |
 | Rules version | `PLAN_VERSION` 8; this week's km is recomputed on update | |
 
-**Unconfirmed:** which of the two causes made the 13 km walk show as 7.7 km. Diagnostics now lists each session's distance and the daily totals to check.
+**Confirmed (owner's screenshot, 21 Nov):** the walk was split into 4 sessions in Health Connect. The all-day distance part is still unconfirmed on the real phone.
 
 ## 2026-11-21: aerobic base for altitude
 
