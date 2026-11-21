@@ -17,6 +17,9 @@ export const LIGHT = 0.75; // light week (period, or every 4th)
 export const PRE_EVENT = 0.75; // the week before the event week
 export const EVENT_WEEK_REST = 0.3; // event week: the event + 30% of a normal week
 export const NO_GOAL_HEADROOM = 1.25; // no goal: grow gently to +25% of where you started
+export const MULTI_DAY_EXTRA = 1.15; // a multi-day trek needs ~15% more weekly volume
+export const B2B_SHARE = 0.2; // the second day of a back-to-back pair
+export const B2B_WEEKS = 8; // back-to-back pairs in the last 8 weeks before the pre-event week
 const KEEP_GROWING = 0.8; // did ≥80% of last week → grow
 const EASE_BELOW = 0.6; // did <60% → ease off 10%
 const DAY_MIN = 0.7; // mid-week rebalancing stays within 70–130% of the plan
@@ -32,6 +35,8 @@ export type WeekVolume = {
   light: LightReason;
   preEvent: boolean;
   eventWeek: boolean;
+  /** Multi-day trek coming: the long walk is a back-to-back pair this week. */
+  backToBack: boolean;
   /** Where the plan is heading, in km a week. */
   destinationKm: number;
   /** With a dated event that can't be reached safely: the long walk you can reach by then. */
@@ -75,7 +80,9 @@ export function typicalWeekKm(activities: Activity[], today: DateKey, rideFactor
 /** Where the plan heads: an aim of N km/day is 7N km a week; an event of X km needs ~X/0.33 a week; the higher wins. */
 export function destinationKm(settings: Pick<Settings, 'dailyTargetKm' | 'event'>, startKm: number): number {
   const aim = settings.dailyTargetKm ? settings.dailyTargetKm * 7 : 0;
-  const ev = settings.event ? settings.event.km / EVENT_LONG_SHARE : 0;
+  const ev = settings.event
+    ? (settings.event.km / EVENT_LONG_SHARE) * ((settings.event.days ?? 1) >= 2 ? MULTI_DAY_EXTRA : 1)
+    : 0;
   return Math.max(aim, ev) || startKm * NO_GOAL_HEADROOM;
 }
 
@@ -97,6 +104,12 @@ export function planVolume({ monday, settings, startKm, prev, periodWeek }: Volu
   const eventMonday = ev ? mondayOf(ev.date) : null;
   const eventWeek = !!eventMonday && eventMonday === monday;
   const preEvent = !!eventMonday && addDays(eventMonday, -7) === monday;
+  const days = ev?.days ?? 1;
+  const backToBack =
+    !!eventMonday &&
+    days >= 2 &&
+    monday < addDays(eventMonday, -7) &&
+    monday >= addDays(eventMonday, -7 - 7 * B2B_WEEKS);
 
   // Light week: your period week if we know your cycle, else every 4th week.
   let light: LightReason = null;
@@ -109,7 +122,7 @@ export function planVolume({ monday, settings, startKm, prev, periodWeek }: Volu
   let base = prev ? prev.volume.baseKm : startKm;
   if (!prev) notes.push(`Starts from your typical week: ${round1(startKm)} km.`);
   const prevWasEasy = !!prev && (prev.volume.light || prev.volume.preEvent || prev.volume.eventWeek);
-  if (!light && !eventWeek && !preEvent && base < destination) {
+  if (prev && !light && !eventWeek && !preEvent && base < destination) {
     const done = prev && prev.volume.km > 0 ? prev.actualKm / prev.volume.km : 1;
     if (prev && !prevWasEasy && done < EASE_BELOW) {
       base *= 0.9;
@@ -130,8 +143,12 @@ export function planVolume({ monday, settings, startKm, prev, periodWeek }: Volu
 
   let km = base;
   if (eventWeek && ev) {
-    km = ev.km + base * EVENT_WEEK_REST;
-    notes.push(`Event week: ${ev.name} (${ev.km} km) plus a few easy days.`);
+    km = ev.km * days + base * EVENT_WEEK_REST;
+    notes.push(
+      days >= 2
+        ? `Trek week: ${ev.name}, ${days} days of ${ev.km} km. Easy days around it.`
+        : `Event week: ${ev.name} (${ev.km} km) plus a few easy days.`,
+    );
   } else if (preEvent && ev) {
     km = base * PRE_EVENT;
     notes.push(`Lighter week before ${ev.name}, to arrive fresh.`);
@@ -157,31 +174,48 @@ export function planVolume({ monday, settings, startKm, prev, periodWeek }: Volu
     }
   }
 
+  if (backToBack && ev) notes.push(`Back-to-back long walks this week: practice for ${days} trek days in a row.`);
+
   return {
     baseKm: round1(base),
     km: round1(km),
     light,
     preEvent,
     eventWeek,
+    backToBack,
     destinationKm: round1(destination),
     ...(reachableEventKm != null ? { reachableEventKm } : {}),
     notes,
   };
 }
 
-/** How the week's km is shared: long walk 30%, brisk walk 15%, the rest across your other training days. */
+/**
+ * How the week's km is shared: long walk 30%, brisk walk 15%, the second
+ * day of a back-to-back pair 20%, trek days their own distance, and the rest
+ * across your other training days.
+ */
 export function weekSplit(
   volume: WeekVolume,
   restDaysPerWeek: number,
-  sessions: { long: boolean; brisk: boolean },
+  sessions: { long: boolean; brisk: boolean; backToBack: boolean; trekDays: number },
   event?: GoalEvent | null,
-): { longKm: number; briskKm: number; regularDayKm: number; regularDays: number } {
+): { longKm: number; briskKm: number; b2bKm: number; trekKm: number; regularDayKm: number; regularDays: number } {
+  const trekKm = sessions.trekDays && event ? event.km : 0;
   const longKm = sessions.long ? (volume.eventWeek && event ? event.km : volume.km * LONG_SHARE) : 0;
   const briskKm = sessions.brisk ? volume.km * BRISK_SHARE : 0;
+  const b2bKm = sessions.backToBack ? volume.km * B2B_SHARE : 0;
+  const keyDays = (sessions.long ? 1 : 0) + (sessions.brisk ? 1 : 0) + (sessions.backToBack ? 1 : 0) + sessions.trekDays;
   const trainingDays = Math.max(1, 7 - restDaysPerWeek);
-  const regularDays = Math.max(1, trainingDays - (sessions.long ? 1 : 0) - (sessions.brisk ? 1 : 0));
-  const regularDayKm = Math.max(0, volume.km - longKm - briskKm) / regularDays;
-  return { longKm: round1(longKm), briskKm: round1(briskKm), regularDayKm: round1(regularDayKm), regularDays };
+  const regularDays = Math.max(1, trainingDays - keyDays);
+  const regularDayKm = Math.max(0, volume.km - longKm - briskKm - b2bKm - trekKm * sessions.trekDays) / regularDays;
+  return {
+    longKm: round1(longKm),
+    briskKm: round1(briskKm),
+    b2bKm: round1(b2bKm),
+    trekKm,
+    regularDayKm: round1(regularDayKm),
+    regularDays,
+  };
 }
 
 /**

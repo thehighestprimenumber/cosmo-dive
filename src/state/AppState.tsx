@@ -2,9 +2,9 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState as RNAppState } from 'react-native';
 import { loadSettings, loadWeekPlan, saveSettings, saveWeekPlan } from '../data/db';
-import { moveSession } from '../domain/plan';
+import { moveSession, normalizePlan } from '../domain/plan';
 import { toDateKey } from '../domain/dates';
-import type { DateKey, KeySessionKind, RegularKind, Settings } from '../domain/types';
+import type { DateKey, RegularKind, Settings } from '../domain/types';
 import { scheduleMorning, setupNotifications } from '../services/notifications';
 import { refresh as runRefresh, type Snapshot } from '../services/sync';
 import { afterSync } from '../services/afterSync';
@@ -21,7 +21,9 @@ type Ctx = {
   refresh: (opts?: { fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: RegularKind }) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
   /** Move a key session to another free day of its week, then re-sync. */
-  moveKeySession: (week: DateKey, kind: KeySessionKind, to: DateKey) => Promise<void>;
+  moveKeySession: (week: DateKey, id: string, to: DateKey) => Promise<void>;
+  /** "My period started today": recorded on the phone, re-plans the light week. */
+  logPeriodStart: () => Promise<void>;
   /** Re-reads settings from the database (e.g. after an import) and rebuilds history. */
   reloadAll: () => Promise<void>;
   /** Asks for data source permission; returns true when ready. */
@@ -109,12 +111,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   );
 
   const moveKeySession = useCallback(
-    async (week: DateKey, kind: KeySessionKind, to: DateKey) => {
-      const plan = await loadWeekPlan(db, week);
-      if (!plan) return;
+    async (week: DateKey, id: string, to: DateKey) => {
+      const saved = await loadWeekPlan(db, week);
+      if (!saved) return;
+      const plan = normalizePlan(saved);
       const today = toDateKey(new Date());
       const todayDone = !!snapshotRef.current?.todayProgress?.done;
-      const next = moveSession(plan, kind, to, today, todayDone);
+      const next = moveSession(plan, id, to, today, todayDone);
       if (next === plan) return;
       await saveWeekPlan(db, next);
       // If today's goal no longer matches the plan, sync replaces it (unless already done).
@@ -122,6 +125,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     },
     [db, doRefresh],
   );
+
+  const logPeriodStart = useCallback(async () => {
+    const today = toDateKey(new Date());
+    const starts = settingsRef.current?.periodStarts ?? [];
+    if (starts.includes(today)) return;
+    await updateSettings({ periodStarts: [...starts, today].slice(-24) });
+    // Next weeks' light week follows; this week's km is recomputed too.
+    await doRefresh({ regenerateToday: true });
+  }, [updateSettings, doRefresh]);
 
   const reloadAll = useCallback(async () => {
     const s = await loadSettings(db, toDateKey(new Date()));
@@ -162,6 +174,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         refresh: doRefresh,
         updateSettings,
         moveKeySession,
+        logPeriodStart,
         reloadAll,
         connect,
       }}

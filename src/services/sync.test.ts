@@ -208,8 +208,8 @@ describe('refresh', () => {
     const plan = (longDay: string, briskDay: string) => ({
       week: MON,
       sessions: [
-        { kind: 'long_walk' as const, day: longDay, plannedDay: longDay },
-        { kind: 'brisk_walk' as const, day: briskDay, plannedDay: briskDay },
+        { id: 'long', kind: 'long_walk' as const, day: longDay, plannedDay: longDay },
+        { id: 'brisk', kind: 'brisk_walk' as const, day: briskDay, plannedDay: briskDay },
       ],
     });
     const at = (day: string, hour: number) => {
@@ -244,7 +244,7 @@ describe('refresh', () => {
         todayKind: 'duration',
       });
       expect(switched.todayGoal?.kind).toBe('duration');
-      expect(switched.plan.sessions.find((x) => x.kind === 'brisk_walk')?.day).toBe(addDays(MON, 4));
+      expect(switched.plan.sessions.find((x) => x.id === 'brisk')?.day).toBe(addDays(MON, 4));
     });
 
     it('moving a key session onto today replaces today\'s goal', async () => {
@@ -267,6 +267,64 @@ describe('refresh', () => {
       const evening = await refresh(db, sourceOf([]), s, { now: at(sun, 19) });
       expect(evening.nextPlan?.week).toBe(addDays(MON, 7));
       expect(evening.nextPlan?.sessions.map((x) => x.kind)).toEqual(['long_walk', 'brisk_walk']);
+    });
+  });
+
+  describe('weekly volume', () => {
+    const MON = '2026-11-23';
+    const at = (day: string, hour: number) => {
+      const d = startOfDay(day);
+      d.setHours(hour);
+      return d;
+    };
+    // 4 past weeks of ~24 km (6 walks of 4 km).
+    const history = Array.from({ length: 28 }, (_, i) => addDays(MON, -28 + i))
+      .filter((_, i) => i % 7 < 6)
+      .map((d) => ({ ...walk(d, 48), distanceM: 4000 }));
+    const s = { ...settings, startDate: '2026-11-16', restDaysPerWeek: 1 };
+
+    it('plans the week from your typical week and gives each day its share', async () => {
+      const db = fakeDb();
+      await migrate(db);
+      const snap = await refresh(db, sourceOf(history), s, { now: at(MON, 9) });
+      expect(snap.week.volume.km).toBe(24);
+      expect(snap.week).toMatchObject({ doneKm: 0, leftKm: 24, lastWeekKm: 24 });
+      expect(snap.todayNotes.join(' ')).toContain('This week: 24 km');
+    });
+
+    it('a big day early in the week makes the next days lighter', async () => {
+      const db = fakeDb();
+      await migrate(db);
+      const db0 = fakeDb();
+      await migrate(db0);
+      const tueBase = await refresh(db0, sourceOf(history), s, { now: at(addDays(MON, 1), 9) });
+      const plannedNote = tueBase.todayNotes[0];
+      const withKayakishMonday = [...history, { ...walk(MON, 150), distanceM: 15000 }];
+      await refresh(db, sourceOf(withKayakishMonday), s, { now: at(MON, 20) });
+      const tue = await refresh(db, sourceOf(withKayakishMonday), s, { now: at(addDays(MON, 1), 9) });
+      expect(tue.week.doneKm).toBe(15);
+      expect(tue.todayNotes[0]).not.toBe(plannedNote);
+      expect(tue.todayNotes[0]).toContain('15 done so far');
+    });
+
+    it('your period week is the light week', async () => {
+      const db = fakeDb();
+      await migrate(db);
+      // Last period started 27 Oct → next expected around 24 Nov, in the week of the 23rd.
+      const snap = await refresh(db, sourceOf(history), { ...s, periodStarts: ['2026-10-27'] }, { now: at(MON, 9) });
+      expect(snap.week.volume.light).toBe('period');
+      expect(snap.week.volume.km).toBe(18);
+      expect(snap.cycle?.next?.start).toBe('2026-11-24');
+    });
+
+    it('a multi-day trek this week: each trek day is a long walk of its distance', async () => {
+      const db = fakeDb();
+      await migrate(db);
+      const event = { name: 'Sierra Norte', km: 15, date: addDays(MON, 2), days: 3 };
+      const snap = await refresh(db, sourceOf(history), { ...s, event }, { now: at(addDays(MON, 2), 7) });
+      expect(snap.plan.sessions.map((x) => x.kind)).toEqual(['trek_day', 'trek_day', 'trek_day']);
+      expect(snap.todayGoal).toEqual({ kind: 'long_walk', meters: 15000 });
+      expect(snap.week.volume.eventWeek).toBe(true);
     });
   });
 });

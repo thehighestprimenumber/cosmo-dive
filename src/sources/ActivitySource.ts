@@ -1,3 +1,4 @@
+import type { Period } from '../domain/cycle';
 import type { Night } from '../domain/readiness';
 import type { Activity } from '../domain/types';
 
@@ -22,4 +23,9 @@ export interface ActivitySource {
   /** Whether sleep can be read (separate, optional permission). */
   hasSleepAccess?(): Promise<boolean>;
   requestSleepAccess?(): Promise<boolean>;
+  /** Recorded periods (first to last day) in [from, to). Optional; places the light week. */
+  getPeriods?(from: Date, to: Date): Promise<Period[]>;
+  /** Whether cycle data can be read (separate, optional permission). */
+  hasCycleAccess?(): Promise<boolean>;
+  requestCycleAccess?(): Promise<boolean>;
 }

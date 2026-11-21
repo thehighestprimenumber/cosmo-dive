@@ -121,7 +121,7 @@ export default function TodayScreen() {
         {snapshot?.forwarded.some((f) => f.day === snapshot.today) && (
           <Card style={{ borderColor: colors.accent }}>
             <Text style={styles.body}>
-              ↪️ Your {snapshot.forwarded.find((f) => f.day === snapshot.today)!.kind === 'long_walk' ? 'long walk' : 'brisk walk'}{' '}
+              ↪️ Your {snapshot.forwarded.find((f) => f.day === snapshot.today)!.kind === 'brisk_walk' ? 'brisk walk' : 'long walk'}{' '}
               moved to today: its day passed before you could do it.
             </Text>
           </Card>
@@ -283,6 +283,7 @@ export default function TodayScreen() {
           <WeekCard
             summary={weekSummary(snapshot.streak.statuses, snapshot.today, settings.restDaysPerWeek, settings.startDate)}
             today={snapshot.today}
+            km={snapshot.week}
           />
         )}
 
@@ -313,7 +314,15 @@ const KIND_CHOICES: { kind: RegularKind; label: string }[] = [
 
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-function WeekCard({ summary, today }: { summary: ReturnType<typeof weekSummary>; today: string }) {
+function WeekCard({
+  summary,
+  today,
+  km,
+}: {
+  summary: ReturnType<typeof weekSummary>;
+  today: string;
+  km: { doneKm: number; leftKm: number; volume: { km: number; light: string | null } };
+}) {
   return (
     <Card>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -339,6 +348,9 @@ function WeekCard({ summary, today }: { summary: ReturnType<typeof weekSummary>;
           </View>
         ))}
       </View>
+      <Text style={[styles.hint, { marginTop: 8 }]}>
+        {km.doneKm} of {km.volume.km} km this week · {km.leftKm} km left{km.volume.light ? ' · light week' : ''}
+      </Text>
     </Card>
   );
 }

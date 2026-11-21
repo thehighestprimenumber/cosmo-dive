@@ -2,6 +2,28 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-21: one weekly-volume engine, period-aware light weeks, multi-day treks
+
+The owner asked to merge the two planning mechanisms (recent activity vs. dated goal), to have the light week during her period, and to support her goal: **multi-day village-to-village treks in Oaxaca's Sierra Norte** in the Argentine winter (Jun–Aug 2027).
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| One engine | Everything comes from **km per week** (walk-equivalent). Recent activity = starting point; aim and/or dated goal = destination. Replaces the aim's +10%-per-goal ramp, the long walk's own progression and the event ramp | `src/domain/volume.ts` |
+| Starting point | Median km of the last 4 complete weeks that have any watch data (weeks without the watch are skipped). With <2 such weeks: daily mode × training days | Days off the watch don't drag it down |
+| Destination | Aim N km/day → 7N/week. Event of X km → X / 0.33 (a long walk is ~1/3 of a peak week); multi-day trek → ×1.15. No goal → +25% over the start | `destinationKm` |
+| Growth | Max +10% a week (the classic safe rule). With an event, just enough to peak 2 weeks before it. If last week you did <80% of the plan: hold; <60%: −10%. The first planned week doesn't grow | `planVolume` |
+| Light week | **The Mon–Sun week holding most of your (predicted) period**: −25% km and no pace push on the brisk walk; heart-rate goals stay in Zone 2; no boss day. Without cycle data: every 4th week, as before. Events win over periods (pre-event and event weeks aren't "light" weeks) | `src/domain/cycle.ts` |
+| Cycle data | Health Connect MenstruationPeriod (optional permission, requested only from the Week tab, never at onboarding) + "My period started today" taps. Cycle length = median of 2+ recorded gaps (18–45 days), else your setting (28). Data stays on the phone | Week tab → 🌸 card |
+| Before an event | The week before the event week: −25%. The event week: the event (km × days) + 30% of a normal week | |
+| Multi-day trek | `days` on the goal; date = first trek day. In the last 8 weeks before the pre-event week, the long walk is a **back-to-back pair** (30% + 20% of the week, consecutive days). In the trek week every trek day is a fixed long walk of the daily km | Owner's goal: Sierra Norte |
+| Reachability | If growing at ≤10%/week can't get the long walk to ~95% of the goal distance by then, the plan says what's reachable (and suggests a later date or shorter goal) | Honesty over pressure |
+| Weekly split | Long walk 30%, brisk walk 15%, back-to-back day 20%, the rest spread over your other training days (7 − rest days − key sessions) | `weekSplit` |
+| Mid-week rebalancing | A regular day's km = (week km − done so far − key sessions still ahead) / (days left − key days left − rest days left), kept within 70–130% of the plan. Set when the day's goal is made, in the morning | Big kayak day → lighter days after |
+| Time and heart-rate goals | Converted from the day's km with your walking pace (time) and half that time in the zone (heart rate) | Everything adds up to the week |
+| Removed | The "lighter after a big day" tweak and the 80–150% clamp around your typical day (the weekly engine covers both); the fixed every-4th recovery week when cycle data exists | |
+| Not trained yet | **Elevation gain** (Sierra Norte is mountainous) and altitude. Possible next step: Health Connect ElevationGained for hill goals | |
+| Rules version | `PLAN_VERSION` 7 | |
+
 ## 2026-11-20: weekly plan (Runna-style)
 
 The owner chose **long walk + brisk walk** as key sessions, **move missed sessions forward**, **next week's plan on Sunday evening**, and **no dated goal yet**, but asked for the feature to be built. Intervals wait for the watch app. Decisions made without asking:

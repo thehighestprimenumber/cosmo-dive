@@ -10,16 +10,22 @@ import {
   saveSettings,
   saveWeekPlan,
 } from '../data/db';
+import { cycleInfo, isPeriodWeek, nextPeriod, type Period } from '../domain/cycle';
 import {
+  dropSession,
   forwardMissed,
   freeDays,
+  goalKindOf,
+  isMovable,
   moveSession,
   nextWeekVisible,
+  normalizePlan,
   planWeek,
   sessionOn,
   type KeySession,
   type WeekPlan,
 } from '../domain/plan';
+import { planVolume, rebalancedDayKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
 import { generateKeySession } from '../domain/sessions';
 import { aimSuggestion, dailyAverageKm } from '../domain/aim';
 import {
@@ -32,8 +38,8 @@ import {
   totalXp,
   type AchievementId,
 } from '../domain/game';
-import { addDays, dateRange, endOfDay, mondayOf, startOfDay, toDateKey } from '../domain/dates';
-import { generateGoal, LOOKBACK_DAYS, PLAN_VERSION } from '../domain/generator';
+import { addDays, dateRange, daysBetween, endOfDay, mondayOf, startOfDay, toDateKey } from '../domain/dates';
+import { baselineFor, generateGoal, LOOKBACK_DAYS, PLAN_VERSION } from '../domain/generator';
 import { activitiesOn, progressOf } from '../domain/progress';
 import { usualStartTime, type TimeOfDay } from '../domain/habits';
 import { readinessFor, type Night, type ReadinessLevel } from '../domain/readiness';
@@ -64,6 +70,16 @@ export type Snapshot = {
   /** When you usually start moving, learned from the last 4 weeks. */
   usualTime: TimeOfDay | null;
   todayBoss: boolean;
+  /** This week's km: planned, done, left, last week's, and each session's share. */
+  week: {
+    volume: WeekVolume;
+    split: ReturnType<typeof weekSplit>;
+    doneKm: number;
+    leftKm: number;
+    lastWeekKm: number;
+  };
+  /** Your cycle, if known (period records or "started today" taps). */
+  cycle: { cycleDays: number; source: 'history' | 'settings'; next: Period | null } | null;
   /** This week's key sessions, and next week's from Sunday evening. */
   plan: WeekPlan;
   nextPlan: WeekPlan | null;
@@ -151,8 +167,59 @@ export async function refresh(
     const g = goals.get(d)?.goal;
     return !!g && progressOf(g, activitiesOn(d, activities), settings).done;
   };
+  const rf = settings.rideFactor;
+
+  // Your cycle (optional): known and predicted periods place the light week.
+  const periodRecords = source.getPeriods
+    ? await source.getPeriods(startOfDay(addDays(today, -400)), endOfDay(today)).catch(() => [] as Period[])
+    : [];
+  const cycle = cycleInfo(periodRecords, settings.periodStarts, settings.cycleDays);
+
+  // The weekly-volume plan: how many km a week, from your recent weeks toward your goal.
+  const startKm = () => {
+    const typical = typicalWeekKm(activities, today, rf);
+    if (typical != null) return typical;
+    const day = baselineFor({ kind: 'distance', meters: 0, suggestedSport: 'walk' }, activities, settings);
+    return ((day?.value ?? 3000) / 1000) * Math.max(1, 7 - settings.restDaysPerWeek);
+  };
+  const volumeFor = async (monday: DateKey, provisional: boolean): Promise<WeekVolume> => {
+    const prevPlan = await loadWeekPlan(db, addDays(monday, -7));
+    const prev = prevPlan?.volume
+      ? { volume: prevPlan.volume, actualKm: weekKm(activities, addDays(monday, -7), rf) }
+      : null;
+    const v = planVolume({
+      monday,
+      settings,
+      startKm: startKm(),
+      prev,
+      periodWeek: cycle ? isPeriodWeek(monday, cycle) : null,
+    });
+    return provisional ? { ...v, provisional: true } : v;
+  };
+  const trekDaysIn = (monday: DateKey): DateKey[] => {
+    const ev = settings.event;
+    if (!ev) return [];
+    return Array.from({ length: ev.days ?? 1 }, (_, i) => addDays(ev.date, i)).filter(
+      (d) => mondayOf(d) === monday,
+    );
+  };
+  const makePlan = async (monday: DateKey, firstDay: DateKey, provisional: boolean): Promise<WeekPlan> => {
+    const volume = await volumeFor(monday, provisional);
+    const p = planWeek(monday, firstDay, activities, settings, {
+      backToBack: volume.backToBack,
+      trekDays: trekDaysIn(monday).filter((d) => d >= firstDay),
+    });
+    return { ...p, volume };
+  };
+
+  if (plan) plan = normalizePlan(plan);
   if (!plan) {
-    plan = planWeek(thisMonday, maxKey(today, start), activities, settings);
+    plan = await makePlan(thisMonday, maxKey(today, start), false);
+    await saveWeekPlan(db, plan);
+  } else if (!plan.volume || plan.volume.provisional || opts.regenerateToday) {
+    // Plans from before weekly volumes, plans made on Sunday for this week, or
+    // a changed aim / event: (re)compute this week's km, keeping the days you arranged.
+    plan = { ...plan, volume: await volumeFor(thisMonday, false) };
     await saveWeekPlan(db, plan);
   }
   // Missed key sessions slide to the next free day this week.
@@ -163,26 +230,47 @@ export async function refresh(
   }
   // You picked another goal type for today: today's key session moves on.
   const todaysSession = sessionOn(plan, today);
-  if (opts.todayKind && todaysSession) {
-    const to = freeDays(plan, today, true, todaysSession.kind)[0];
-    plan = to
-      ? moveSession(plan, todaysSession.kind, to, today, true)
-      : {
-          ...plan,
-          sessions: plan.sessions.map((x) => (x.kind === todaysSession.kind ? { ...x, dropped: true } : x)),
-        };
+  if (opts.todayKind && todaysSession && isMovable(todaysSession)) {
+    const to = freeDays(plan, today, true, todaysSession.id)[0];
+    plan = to ? moveSession(plan, todaysSession.id, to, today, true) : dropSession(plan, todaysSession.id);
     await saveWeekPlan(db, plan);
   }
   // Next week's plan from Sunday evening, so you can arrange it before Monday.
   const nextMonday = addDays(thisMonday, 7);
   let nextPlan = await loadWeekPlan(db, nextMonday);
+  if (nextPlan) nextPlan = normalizePlan(nextPlan);
   if (!nextPlan && nextWeekVisible(now)) {
-    nextPlan = planWeek(nextMonday, nextMonday, activities, settings);
+    nextPlan = await makePlan(nextMonday, nextMonday, true);
     await saveWeekPlan(db, nextPlan);
   }
 
+  // Each session's km for a plan's week.
+  const splitOf = (p: WeekPlan) => {
+    const live = p.sessions.filter((x) => !x.dropped);
+    return weekSplit(
+      p.volume!,
+      settings.restDaysPerWeek,
+      {
+        long: live.some((x) => x.kind === 'long_walk'),
+        brisk: live.some((x) => x.kind === 'brisk_walk'),
+        backToBack: live.some((x) => x.kind === 'back_to_back'),
+        trekDays: live.filter((x) => x.kind === 'trek_day').length,
+      },
+      settings.event,
+    );
+  };
+  const keyKm = (x: KeySession, split: ReturnType<typeof splitOf>) =>
+    x.kind === 'long_walk'
+      ? split.longKm
+      : x.kind === 'brisk_walk'
+        ? split.briskKm
+        : x.kind === 'back_to_back'
+          ? split.b2bKm
+          : split.trekKm;
+
   // Today's goal must match the plan: a key session if one is on today, a regular goal otherwise.
-  const wantKey = sessionOn(plan, today)?.kind;
+  const todaysKey = sessionOn(plan, today);
+  const wantKey = todaysKey ? goalKindOf(todaysKey.kind) : undefined;
   const haveKind = todays?.goal?.kind;
   const isKey = (k?: string) => k === 'long_walk' || k === 'brisk_walk';
   const planMismatch = !!todays && (wantKey ? haveKind !== wantKey : isKey(haveKind));
@@ -205,14 +293,63 @@ export async function refresh(
   for (const date of start <= today ? dateRange(start, today) : []) {
     let daily = goals.get(date);
     if (!daily && date >= generateFrom) {
-      const statuses = computeStreak(history, date, settings.restDaysPerWeek).statuses;
+      const streakSoFar = computeStreak(history, date, settings.restDaysPerWeek);
+      const statuses = streakSoFar.statuses;
       const readiness = source.getNights ? readinessFor(date, nights) : undefined;
       const kind = date === today ? opts.todayKind : undefined;
       const dayPlan = date >= thisMonday ? plan : await loadWeekPlan(db, mondayOf(date));
-      const key = sessionOn(dayPlan, date)?.kind;
-      daily = key
-        ? generateKeySession({ date, kind: key, settings, activities, history, readiness })
-        : generateGoal({ date, settings, activities, history, statuses, readiness, kind });
+      const key = sessionOn(dayPlan, date);
+      const volume = dayPlan?.volume;
+      if (dayPlan && volume) {
+        const split = splitOf(dayPlan);
+        const monday = dayPlan.week;
+        if (key) {
+          daily = generateKeySession({
+            date,
+            kind: key.kind,
+            settings,
+            activities,
+            history,
+            readiness,
+            targetKm: keyKm(key, split),
+            light: !!volume.light,
+            weekNotes: volume.notes,
+          });
+        } else {
+          // Mid-week rebalancing: what's left of the week over the days left.
+          const doneKm = weekKm(activities, monday, rf, addDays(date, -1));
+          const keyAhead = dayPlan.sessions.filter((x) => !x.dropped && x.day >= date);
+          const dayKm = rebalancedDayKm({
+            plannedDayKm: split.regularDayKm,
+            weekKm: volume.km,
+            doneKm,
+            keyKmLeft: keyAhead.reduce((t, x) => t + keyKm(x, split), 0),
+            daysLeft: daysBetween(date, addDays(monday, 6)) + 1,
+            keyDaysLeft: keyAhead.length,
+            restLeft: streakSoFar.restLeftThisWeek,
+          });
+          const planNotes = [
+            `This week: ${volume.km} km (${Math.round(doneKm * 10) / 10} done so far). Today’s share: ${dayKm} km.`,
+            ...volume.notes,
+          ];
+          daily = generateGoal({
+            date,
+            settings,
+            activities,
+            history,
+            statuses,
+            readiness,
+            kind,
+            dayKm,
+            planNotes,
+            light: !!volume.light,
+          });
+        }
+      } else {
+        daily = key
+          ? generateKeySession({ date, kind: key.kind, settings, activities, history, readiness, targetKm: 5 })
+          : generateGoal({ date, settings, activities, history, statuses, readiness, kind });
+      }
       await insertGoal(db, daily);
       goals.set(date, daily);
     }
@@ -295,13 +432,34 @@ export async function refresh(
     todayBoss: !!goals.get(today)?.meta?.boss,
     plan,
     nextPlan,
+    week: (() => {
+      const doneKm = weekKm(activities, thisMonday, rf, today);
+      const volume = plan.volume!;
+      return {
+        volume,
+        split: splitOf(plan),
+        doneKm: Math.round(doneKm * 10) / 10,
+        leftKm: Math.max(0, Math.round((volume.km - doneKm) * 10) / 10),
+        lastWeekKm: Math.round(weekKm(activities, addDays(thisMonday, -7), rf) * 10) / 10,
+      };
+    })(),
+    cycle: cycle
+      ? { cycleDays: cycle.cycleDays, source: cycle.source, next: nextPeriod(cycle, today) }
+      : null,
     forwarded: forwarded.moved,
     previews: Object.fromEntries(
       [...plan.sessions, ...(nextPlan?.sessions ?? [])]
         .filter((x) => x.day > today && !x.dropped)
         .map((x) => [
           x.day,
-          generateKeySession({ date: x.day, kind: x.kind, settings, activities, history }).goal,
+          generateKeySession({
+            date: x.day,
+            kind: x.kind,
+            settings,
+            activities,
+            history,
+            targetKm: keyKm(x, splitOf(x.day >= nextMonday && nextPlan ? nextPlan : plan)),
+          }).goal,
         ]),
     ),
     aim: settings.dailyTargetKm

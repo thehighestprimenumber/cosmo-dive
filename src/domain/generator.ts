@@ -1,6 +1,6 @@
 import { addDays, daysBetween, mondayOf, toDateKey } from './dates';
-import { formatKm, formatMinutes } from './format';
-import { AIM_START, AIM_STEP, aimPerTrainingDay } from './aim';
+import { formatKm, formatMinutes, formatPace } from './format';
+import { AIM_START, AIM_STEP, aimPerTrainingDay, walkingPace } from './aim';
 import { BOSS_FACTOR, isBossDay, XP } from './game';
 import { measure } from './progress';
 import type { Readiness } from './readiness';
@@ -23,7 +23,7 @@ import type {
  * that created them, so old history never gets silently reinterpreted, and
  * goals from older versions are never used as a starting point.
  */
-export const PLAN_VERSION = 6;
+export const PLAN_VERSION = 7;
 
 /** How far back "your typical day" looks. */
 export const LOOKBACK_DAYS = 90;
@@ -69,7 +69,20 @@ export type GeneratorInput = {
   readiness?: Readiness;
   /** You picked the goal type yourself (e.g. a time goal on a kayak day). */
   kind?: RegularKind;
+  /**
+   * Weekly-volume plan: this day's km (already rebalanced for the week so far).
+   * When set, the target comes from it instead of the day-by-day rules.
+   */
+  dayKm?: number;
+  /** Why the week and the day have the km they have. */
+  planNotes?: string[];
+  /** Light week: heart-rate goals stay in Zone 2. */
+  light?: boolean;
 };
+
+/** Heart-rate goals ask for this share of the day's time in the zone. */
+const ZONE_SHARE = 0.5;
+const DEFAULT_PACE_S_PER_M = 0.72; // 12:00 min/km
 
 export function generateGoal({
   date,
@@ -79,6 +92,9 @@ export function generateGoal({
   statuses,
   readiness,
   kind: chosenKind,
+  dayKm,
+  planNotes = [],
+  light,
 }: GeneratorInput): DailyGoal {
   const windowStart = addDays(date, -LOOKBACK_DAYS);
   const recent = activities.filter((a) => {
@@ -102,6 +118,9 @@ export function generateGoal({
     spec = { kind, seconds: 0 };
   }
   const notes: string[] = [];
+  if (dayKm != null) {
+    return fromWeeklyPlan({ date, spec, dayKm, recent, readiness, chosen: !!chosenKind, planNotes, light });
+  }
   if (chosenKind) notes.push('You picked this goal type for today.');
   const fmt = (v: number) => (kind === 'distance' ? formatKm(v) : formatMinutes(v));
 
@@ -195,6 +214,59 @@ export function generateGoal({
     goal: withTarget(spec, target),
     planVersion: PLAN_VERSION,
     meta: { base: roundTo(base, STEP[kind]), notes, readiness: readiness?.level ?? 'unknown', ...(boss ? { boss } : {}) },
+  };
+}
+
+/**
+ * A regular day in a weekly-volume plan: its km, as distance, as time at your
+ * walking pace, or as time in a heart-rate zone (half of that time).
+ * Readiness and boss days still tweak today only.
+ */
+function fromWeeklyPlan(p: {
+  date: DateKey;
+  spec: RegularGoalSpec;
+  dayKm: number;
+  recent: Activity[];
+  readiness?: Readiness;
+  chosen: boolean;
+  planNotes: string[];
+  light?: boolean;
+}): DailyGoal {
+  const { date, dayKm, recent, readiness } = p;
+  let spec = p.spec;
+  if (p.light && spec.kind === 'hr_zone') spec = { ...spec, zone: 2 };
+  const pace = walkingPace(recent) ?? DEFAULT_PACE_S_PER_M;
+  const notes = [...(p.chosen ? ['You picked this goal type for today.'] : []), ...p.planNotes];
+  const kind = spec.kind;
+  let base: number;
+  if (kind === 'distance') base = dayKm * 1000;
+  else if (kind === 'duration') base = dayKm * 1000 * pace;
+  else base = dayKm * 1000 * pace * ZONE_SHARE;
+  if (kind !== 'distance') {
+    notes.push(`${formatKm(dayKm * 1000)} at your walking pace (${formatPace(pace * 1000)}) is about ${formatMinutes(dayKm * 1000 * pace)}.`);
+  }
+
+  let target = base;
+  if (readiness && readiness.level !== 'unknown') {
+    target *= readiness.factor;
+    notes.push(...readiness.notes);
+  }
+  const boss = isBossDay(date) && !p.light;
+  if (boss) {
+    target *= BOSS_FACTOR;
+    notes.push(`⚔️ Boss day: 25% harder, worth ${XP.boss} XP.`);
+  }
+  target = clamp(roundTo(target, STEP[kind]), LIMITS[kind][0], LIMITS[kind][1]);
+  return {
+    date,
+    goal: withTarget(spec, target) as RegularGoalSpec,
+    planVersion: PLAN_VERSION,
+    meta: {
+      base: roundTo(base, STEP[kind]),
+      notes,
+      readiness: readiness?.level ?? 'unknown',
+      ...(boss ? { boss } : {}),
+    },
   };
 }
 

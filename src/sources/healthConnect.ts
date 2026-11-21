@@ -10,6 +10,7 @@ import {
 } from 'react-native-health-connect';
 import { toDateKey } from '../domain/dates';
 import { dedupeActivities } from '../domain/progress';
+import type { Period } from '../domain/cycle';
 import { lowPoint, type Night } from '../domain/readiness';
 import type { Activity, HrSample, Sport } from '../domain/types';
 import type { ActivitySource, SourceStatus } from './ActivitySource';
@@ -36,6 +37,7 @@ const PERMISSIONS = [
   // Optional: sleep makes goals readiness-aware.
   { accessType: 'read' as const, recordType: 'SleepSession' as const },
 ];
+// Periods (optional, sensitive) are only requested from the Week tab: requestCycleAccess().
 
 let initialized = false;
 
@@ -50,7 +52,11 @@ const between = (from: Date, to: Date) => ({
   endTime: to.toISOString(),
 });
 
-async function readAll<T extends 'ExerciseSession' | 'HeartRate' | 'SleepSession'>(type: T, from: Date, to: Date) {
+async function readAll<T extends 'ExerciseSession' | 'HeartRate' | 'SleepSession' | 'MenstruationPeriod'>(
+  type: T,
+  from: Date,
+  to: Date,
+) {
   const out = [];
   let pageToken: string | undefined;
   do {
@@ -74,6 +80,29 @@ export const healthConnectSource: ActivitySource = {
     if (!(await ensureInitialized())) return false;
     const granted = await requestPermission([{ accessType: 'read', recordType: 'SleepSession' }]);
     return granted.some((p) => p.recordType === 'SleepSession' && p.accessType === 'read');
+  },
+
+  async hasCycleAccess() {
+    if (!(await ensureInitialized())) return false;
+    const granted = await getGrantedPermissions();
+    return granted.some((p) => p.recordType === 'MenstruationPeriod' && p.accessType === 'read');
+  },
+
+  async requestCycleAccess() {
+    if (!(await ensureInitialized())) return false;
+    const granted = await requestPermission([{ accessType: 'read', recordType: 'MenstruationPeriod' }]);
+    return granted.some((p) => p.recordType === 'MenstruationPeriod' && p.accessType === 'read');
+  },
+
+  async getPeriods(from: Date, to: Date): Promise<Period[]> {
+    await ensureInitialized();
+    const records = await readAll('MenstruationPeriod', from, to);
+    // The native module returns startTime/endTime (the record is an interval),
+    // although the library's TypeScript type describes a single instant.
+    return records.map((r) => {
+      const rec = r as unknown as { startTime: string; endTime: string };
+      return { start: toDateKey(new Date(rec.startTime)), end: toDateKey(new Date(new Date(rec.endTime).getTime() - 1)) };
+    });
   },
 
   async getNights(from: Date, to: Date): Promise<Night[]> {

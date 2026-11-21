@@ -49,6 +49,10 @@ export const demoSource: ActivitySource = {
     return out.filter((a) => a.start >= from.getTime() && a.start < to.getTime());
   },
 
+  hasCycleAccess: async () => true,
+  requestCycleAccess: async () => true,
+  getPeriods: async () => [],
+
   hasSleepAccess: async () => true,
   requestSleepAccess: async () => true,
 

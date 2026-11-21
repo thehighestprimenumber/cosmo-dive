@@ -78,8 +78,11 @@ export type GoalMeta = {
   pace?: number;
 };
 
-/** A dated goal the long walk builds toward, e.g. a 15 km hike on 31 Dec. */
-export type GoalEvent = { name: string; km: number; date: DateKey };
+/**
+ * A dated goal the plan builds toward, e.g. a 15 km hike on 31 Dec, or a
+ * multi-day trek: `km` per day for `days` days in a row from `date`.
+ */
+export type GoalEvent = { name: string; km: number; date: DateKey; days?: number };
 
 /**
  * Stored once per day and never rewritten (except today's, see sync.ts).
@@ -105,8 +108,12 @@ export type Settings = {
    * Goals step up toward it; the monthly challenge is at least aim × days.
    */
   dailyTargetKm: number | null;
-  /** Optional dated goal; the weekly long walk ramps toward it. */
+  /** Optional dated goal; the weekly plan builds toward it. */
   event: GoalEvent | null;
+  /** "My period started today" taps (used with or without Health Connect cycle data). */
+  periodStarts: DateKey[];
+  /** Typical cycle length, used until 2+ cycles are known. */
+  cycleDays: number;
   /** "Not now" on raising the aim: don't ask again before this date. */
   aimSnoozedUntil: DateKey | null;
   /** The aim we already sent a "you reached it" notification for. */
@@ -136,6 +143,8 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   rideFactor: 3,
   dailyTargetKm: null,
   event: null,
+  periodStarts: [],
+  cycleDays: 28,
   aimSnoozedUntil: null,
   aimNotifiedKm: null,
   maxHr: 185,
