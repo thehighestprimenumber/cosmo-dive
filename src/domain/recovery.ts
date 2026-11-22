@@ -18,7 +18,7 @@ export function recoveryAfter(yesterdayKm: number, regularDayKm: number): string
   if (yesterdayKm < Math.max(BIG_DAY_MIN_KM, BIG_DAY_SHARE * regularDayKm)) return null;
   const times = Math.round((yesterdayKm / regularDayKm) * 10) / 10;
   return [
-    `🛌 Recovery day: yesterday you walked ${formatKm(yesterdayKm * 1000)}, ${times}× a usual day.`,
+    `🛌 Recovery day: yesterday you walked ${formatKm(yesterdayKm * 1000)}, ${times}× a regular day of your plan (${formatKm(regularDayKm * 1000)}).`,
     `Rest today, or take an easy ${RECOVERY_MINUTES}-minute stroll if you feel like moving. Resting doesn't use one of your rest days or touch your streak.`,
   ];
 }

@@ -19,7 +19,7 @@ export function usualStartTime(activities: Activity[], today: DateKey): TimeOfDa
   const firstByDay = new Map<DateKey, number>();
   for (const a of activities) {
     const d = toDateKey(a.start);
-    if (d < from || d >= today || a.durationS < MIN_ACTIVITY_S) continue;
+    if (a.synthetic || d < from || d >= today || a.durationS < MIN_ACTIVITY_S) continue;
     const start = new Date(a.start);
     const minutes = start.getHours() * 60 + start.getMinutes();
     firstByDay.set(d, Math.min(firstByDay.get(d) ?? Infinity, minutes));

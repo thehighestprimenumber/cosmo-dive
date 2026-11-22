@@ -223,7 +223,7 @@ export async function refresh(
   const dailyDistance = source.getDailyDistance
     ? await source.getDailyDistance(startOfDay(fetchFrom), endOfDay(today)).catch(() => ({}))
     : {};
-  const activities = withAllDayWalking(sessions, dailyDistance);
+  const activities = withAllDayWalking(sessions, dailyDistance, walkingPace(sessions) ?? undefined);
 
   // How hard key sessions felt (your ratings), and strength sessions ticked off.
   const feelings = await loadFeelings(db, addDays(fetchFrom, -7), today);

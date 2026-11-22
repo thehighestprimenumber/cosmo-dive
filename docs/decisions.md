@@ -2,6 +2,18 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: unrecorded walking counts for time goals; duplicate sessions count once
+
+From the owner's screenshots (22 Nov): Samsung showed 2.04 km and 15 active minutes, Daily Spark's 20-minute recovery goal showed 0 min; the week showed 22.6 km but today's goal note said "41.2 done so far".
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Time goals | The day's distance outside recorded workouts now also counts as time, at your walking pace (≈12 min/km until known) | Weekly km (and so time goals) already include that distance; the time should count too. `withAllDayWalking` |
+| Duplicates | Sessions of the same sport that overlap for more than half of the shorter one count once (the one with more distance) | Most likely cause of 41.2 km: Samsung's parts of a walk and the merged walk present at the same time while it re-syncs. `withoutOverlaps` |
+| Your pace | Ignores that estimated time (and habits ignore it too) | Otherwise the estimate would feed itself |
+| Wording | "5.8× a regular day of your plan (2.6 km)" instead of "a usual day" | It's the plan's share for a regular day, not your history |
+| Stored notes | Today's "Why this goal" note keeps the 41.2 km it was made with (goals are never rewritten); the numbers on the cards are recomputed every sync | |
+
 ## 2026-11-22: guided strength session on the watch
 
 | Topic | Decision | Why / how to change |

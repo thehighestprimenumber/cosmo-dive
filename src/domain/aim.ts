@@ -31,7 +31,7 @@ export function aimPerTrainingDay(
 /** Your usual walking pace in seconds per metre: median over walks of 15+ min with a distance. */
 export function walkingPace(activities: Activity[]): number | null {
   const paces = activities
-    .filter((a) => a.sport === 'walk' && a.durationS >= 15 * 60 && a.distanceM && a.distanceM > 500)
+    .filter((a) => a.sport === 'walk' && !a.synthetic && a.durationS >= 15 * 60 && a.distanceM && a.distanceM > 500)
     .map((a) => a.durationS / a.distanceM!)
     .sort((a, b) => a - b);
   if (paces.length < 3) return null;
