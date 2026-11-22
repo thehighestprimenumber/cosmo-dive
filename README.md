@@ -41,7 +41,7 @@ Daily Spark reads the walks and rides your Galaxy Watch records (Samsung Health 
 
 ## Install on your phone
 
-**From your phone (easiest):** every push is built by GitHub Actions ([`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml)) and published under **Releases**. Open the newest "Daily Spark build N", download the `.apk`, and allow "install unknown apps" when Android asks. Each build installs over the previous one and keeps your data.
+**From your phone (easiest):** every push is built by GitHub Actions ([`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml)) and published under **Releases**. Open the newest "Daily Spark build N", download the `.apk`, and allow "install unknown apps" when Android asks. Each build installs over the previous one and keeps your data. Pushes less than 5 minutes apart only build the last one.
 
 Before a build is published, CI opens it on an Android 14 emulator. If the app crashes or the welcome screen doesn't show, the build is not published. CI then walks through onboarding with demo data, Today, Calendar, Settings and Diagnostics, taking a screenshot of each. A failed walkthrough only raises a warning. The logs and screenshots are in the run's `smoke-test-logs` artifact.
 

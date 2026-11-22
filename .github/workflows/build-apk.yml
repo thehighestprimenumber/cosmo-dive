@@ -11,15 +11,43 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: apk-${{ github.ref }}
-  # Queue new pushes instead of cancelling a build that may be about to publish.
-  cancel-in-progress: false
-
 jobs:
+  # Pushes less than 5 minutes apart: only the last one is built. Older runs
+  # of this branch started within 5 minutes before this one are cancelled;
+  # older ones keep going (they may be about to publish).
+  supersede:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel builds superseded within 5 minutes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          this=$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq .created_at)
+          this_s=$(date -d "$this" +%s)
+          gh api "repos/$REPO/actions/workflows/build-apk.yml/runs?branch=$BRANCH&per_page=30" \
+            --jq '.workflow_runs[] | select(.status != "completed") | "\(.id) \(.created_at)"' |
+          while read -r id created; do
+            [ "$id" = "$RUN_ID" ] && continue
+            age=$(( this_s - $(date -d "$created" +%s) ))
+            if [ "$age" -ge 0 ] && [ "$age" -lt 300 ]; then
+              echo "Cancelling run $id (started ${age}s before this one)"
+              gh api -X POST "repos/$REPO/actions/runs/$id/cancel" || true
+            fi
+          done
+
   build:
+    needs: supersede
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # One build at a time per branch; a newer one waits instead of cancelling.
+    concurrency:
+      group: apk-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
 

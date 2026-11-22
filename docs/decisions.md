@@ -2,6 +2,15 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: CI builds only the last of quick pushes
+
+The owner asked: when builds are less than 5 minutes apart, cancel all but the last.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Rule | Each run first cancels this branch's unfinished runs that started less than 5 minutes before it. Older runs keep going | Quick fix-ups don't queue a build each; a build that's been running a while (maybe about to publish) isn't lost. `supersede` job in `.github/workflows/build-apk.yml` |
+| Queue | Builds of a branch still run one at a time (job-level concurrency on `build`) | Same as before |
+
 ## 2026-11-22: AI coach, step 2: the chat
 
 The owner chose rules as the base and AI for judgement and context ("hybrid"). The chat is where you tell the coach what the data can't show.
