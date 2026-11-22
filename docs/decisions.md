@@ -2,6 +2,13 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: smaller APK
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| One APK per CPU type | ABI splits (config plugin `plugins/withAbiSplits.js`): the release has an arm64 APK for phones; an x86_64 APK is built only for the emulator smoke test and isn't published | The universal APK carried both sets of native libraries (66 MB) |
+| Not done | R8 minification stays off | It stripped WorkManager's database class and crashed the app at launch |
+
 ## 2026-11-22: AI coach, step 3: morning check-in
 
 | Topic | Decision | Why / how to change |

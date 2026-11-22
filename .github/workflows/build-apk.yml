@@ -96,8 +96,13 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,x86_64
 
-      - name: Rename APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk "daily-spark-${GITHUB_RUN_NUMBER}.apk"
+      # One APK per CPU type (plugins/withAbiSplits.js): arm64 is published for
+      # phones, x86_64 is only for the emulator smoke test.
+      - name: Rename APKs
+        run: |
+          cp android/app/build/outputs/apk/release/app-arm64-v8a-release.apk "daily-spark-${GITHUB_RUN_NUMBER}.apk"
+          cp android/app/build/outputs/apk/release/app-x86_64-release.apk "emulator-x86_64-${GITHUB_RUN_NUMBER}.apk"
+          ls -lh *.apk
 
       # Watch app (Wear OS Tile). Signed with the phone app's key (from prebuild) so the
       # Data Layer connects them. Doesn't block the phone APK while it's being tuned.
@@ -119,7 +124,9 @@ jobs:
       - uses: actions/upload-artifact@v5
         with:
           name: daily-spark-apk
-          path: daily-spark-*.apk
+          path: |
+            daily-spark-*.apk
+            emulator-*.apk
           retention-days: 14
 
   # Opens the APK on an Android 14 emulator; fails if the app crashes on launch.
@@ -149,7 +156,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           # The launch check gates publishing; the walkthrough only reports.
-          script: ./scripts/smoke-test.sh "daily-spark-${GITHUB_RUN_NUMBER}.apk" || exit 1; ./scripts/walkthrough.sh > walkthrough.log 2>&1 || touch walkthrough-failed; cat walkthrough.log || true
+          script: ./scripts/smoke-test.sh "emulator-x86_64-${GITHUB_RUN_NUMBER}.apk" || exit 1; ./scripts/walkthrough.sh > walkthrough.log 2>&1 || touch walkthrough-failed; cat walkthrough.log || true
 
       - name: Report walkthrough
         if: always()
