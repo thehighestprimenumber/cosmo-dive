@@ -1,6 +1,6 @@
 import type { Period } from '../domain/cycle';
 import type { Night } from '../domain/readiness';
-import type { Activity } from '../domain/types';
+import type { Activity, HrSample } from '../domain/types';
 
 export type SourceStatus =
   | { state: 'ready' }
@@ -20,6 +20,8 @@ export interface ActivitySource {
   getActivities(from: Date, to: Date): Promise<Activity[]>;
   /** Total distance per local day ("YYYY-MM-DD" → metres), workouts included. Optional. */
   getDailyDistance?(from: Date, to: Date): Promise<Record<string, number>>;
+  /** All-day heart rate readings in [from, to). Optional; gives active minutes outside workouts. */
+  getHeartRate?(from: Date, to: Date): Promise<HrSample[]>;
   /** Nights of sleep whose wake-up date falls in [from, to). Optional; used for readiness. */
   getNights?(from: Date, to: Date): Promise<Night[]>;
   /** Whether sleep can be read (separate, optional permission). */

@@ -48,7 +48,7 @@ export function goalSubtitle(goal: GoalSpec, settings: Pick<Settings, 'maxHr'>):
     case 'distance':
       return 'Walks, runs and rides today add up (other sports count for time goals).';
     case 'duration':
-      return 'Any exercise your watch records counts: walks, rides, kayak, swimming, gym…';
+      return 'Any exercise counts: recorded workouts, plus time with your heart rate up (zone 2+) outside them.';
     case 'hr_zone': {
       const [lo, hi] = zoneRange(goal.zone, settings.maxHr);
       return `Keep your heart rate at ${lo}–${hi} bpm during any exercise.`;

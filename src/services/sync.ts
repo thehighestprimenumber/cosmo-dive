@@ -14,6 +14,7 @@ import {
 } from '../data/db';
 import { isAerobicPhase, WEEKLY_ZONE2_SHARE, zone2Minutes } from '../domain/aerobic';
 import { withAllDayWalking } from '../domain/allday';
+import { ACTIVE_TIME_DAYS, raisedBpm, raisedSeconds } from '../domain/activeTime';
 import { cycleInfo, isPeriodWeek, nextPeriod, type Period } from '../domain/cycle';
 import { hasElevationData, longWalkClimb, typicalClimbPerKm } from '../domain/elevation';
 import {
@@ -93,6 +94,8 @@ export type Snapshot = {
   feelings: Record<DateKey, number>;
   /** A key session done today or yesterday, waiting for "how did it feel?". */
   toRate: { date: DateKey; kind: SessionKind } | null;
+  /** Active minutes from all-day heart rate today (for Diagnostics): threshold, minutes, readings. */
+  activeTime: { thresholdBpm: number; todayS: number | null; readingsToday: number; medianGapS: number | null };
   /** Work days from your calendar, this week and next. */
   busyDays: DateKey[];
   /** Key sessions this sync moved off a work day. */
@@ -223,7 +226,13 @@ export async function refresh(
   const dailyDistance = source.getDailyDistance
     ? await source.getDailyDistance(startOfDay(fetchFrom), endOfDay(today)).catch(() => ({}))
     : {};
-  const activities = withAllDayWalking(sessions, dailyDistance, walkingPace(sessions) ?? undefined);
+  // Active minutes outside workouts, from the watch's all-day heart rate (last 2 weeks).
+  const hrFrom = addDays(today, -(ACTIVE_TIME_DAYS - 1));
+  const allDayHr = source.getHeartRate
+    ? await source.getHeartRate(startOfDay(hrFrom), endOfDay(today)).catch(() => [])
+    : [];
+  const activeSeconds = raisedSeconds(allDayHr, raisedBpm(settings.maxHr), sessions);
+  const activities = withAllDayWalking(sessions, dailyDistance, walkingPace(sessions) ?? undefined, activeSeconds);
 
   // How hard key sessions felt (your ratings), and strength sessions ticked off.
   const feelings = await loadFeelings(db, addDays(fetchFrom, -7), today);
@@ -561,6 +570,16 @@ export async function refresh(
     todayRecovery: !!goals.get(today)?.meta?.recovery,
     feelings: Object.fromEntries([...feelings].filter(([d]) => d >= addDays(thisMonday, -7))),
     toRate: sessionToRate([plan, await loadWeekPlan(db, addDays(thisMonday, -7))], today, doneOn, feelings),
+    activeTime: (() => {
+      const todays = allDayHr.filter((x) => toDateKey(x.t) === today).sort((a, b) => a.t - b.t);
+      const gaps = todays.slice(1).map((x, i) => (x.t - todays[i].t) / 1000).sort((a, b) => a - b);
+      return {
+        thresholdBpm: raisedBpm(settings.maxHr),
+        todayS: activeSeconds[today] ?? null,
+        readingsToday: todays.length,
+        medianGapS: gaps.length ? Math.round(gaps[Math.floor(gaps.length / 2)]) : null,
+      };
+    })(),
     busyDays: busy,
     shiftMoves,
     weather: {

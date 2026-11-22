@@ -20,6 +20,11 @@ export function withAllDayWalking(
   dailyMeters: Record<DateKey, number>,
   /** Your walking pace (s per m), to turn the extra distance into minutes for time goals. */
   paceSPerM = DEFAULT_PACE_S_PER_M,
+  /**
+   * Seconds of raised heart rate outside workouts, per day (see activeTime.ts).
+   * Days listed here use these instead of the distance-based estimate.
+   */
+  activeSeconds: Record<DateKey, number> = {},
 ): Activity[] {
   // A walking pace outside 9–17 min/km is a measuring glitch: keep the estimate sensible.
   const pace = Math.min(MAX_PACE_S_PER_M, Math.max(MIN_PACE_S_PER_M, paceSPerM));
@@ -39,12 +44,29 @@ export function withAllDayWalking(
       sport: 'walk',
       start: noon,
       end: noon,
-      // Time at your walking pace, so an unrecorded stroll counts for time goals too.
-      durationS: Math.round(gap * pace),
+      // Time: from heart rate when known (added below), else at your walking pace.
+      durationS: date in activeSeconds ? 0 : Math.round(gap * pace),
       distanceM: gap,
       hr: [],
       origin: 'all-day',
       label: 'other walking',
+      synthetic: true,
+    });
+  }
+  // Active time outside workouts, from heart rate: counts for time goals (any sport).
+  for (const [date, seconds] of Object.entries(activeSeconds)) {
+    if (seconds < 60) continue;
+    const noon = startOfDay(date).getTime() + 12 * 3_600_000;
+    extra.push({
+      id: `active-${date}`,
+      sport: 'other',
+      start: noon,
+      end: noon,
+      durationS: seconds,
+      distanceM: null,
+      hr: [],
+      origin: 'all-day',
+      label: 'active (raised heart rate)',
       synthetic: true,
     });
   }

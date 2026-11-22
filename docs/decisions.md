@@ -2,6 +2,18 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: active minutes from all-day heart rate
+
+The owner asked for Samsung's "move minutes". Health Connect doesn't share Samsung's raised-HR or active time (its newer activity-intensity type isn't in our library, and it's unclear whether Samsung writes it).
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| What counts | Time with the heart rate at zone 2 or more (60% of max HR; 111 bpm at 185) **outside recorded workouts**, from the watch's all-day readings. Two raised readings up to 6 minutes apart are joined; further apart, not | Close to Samsung's "raised HR activity time"; works for any activity. `raisedSeconds` in `src/domain/activeTime.ts` |
+| Where it counts | Time goals (with recorded workouts, which count with their own duration). It replaces the distance-based estimate on days with heart-rate readings; days without readings keep the estimate | |
+| How far back | The last 14 days on each sync (older days keep the estimate) | All-day heart rate is a lot of data |
+| Check | Diagnostics (🐞): today's active minutes, the threshold, the number of readings and how often the watch reads | Compare with Samsung for a few days; tune the threshold or the 6-minute gap if needed |
+| Next if needed | Steps per minute (≥100/min) needs a new Health Connect permission, so an APK | |
+
 ## 2026-11-22: over-the-air updates (EAS Update)
 
 | Topic | Decision | Why / how to change |

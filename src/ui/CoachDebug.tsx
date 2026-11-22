@@ -15,7 +15,8 @@ import { colors } from './theme';
  */
 export function CoachDebug({ refreshKey = 0 }: { refreshKey?: number }) {
   const db = useSQLiteContext();
-  const { settings } = useApp();
+  const { settings, snapshot } = useApp();
+  const at = snapshot?.activeTime;
   const [log, setLog] = useState<CoachCall[]>([]);
   const [key, setKey] = useState<string | null>(null);
 
@@ -36,6 +37,9 @@ export function CoachDebug({ refreshKey = 0 }: { refreshKey?: number }) {
   const lines = [
     `Build ${build} · model ${COACH_MODEL}`,
     updateInfo(),
+    at
+      ? `Active today (heart rate ≥ ${at.thresholdBpm} bpm, outside workouts): ${at.todayS == null ? 'no readings' : `${Math.round(at.todayS / 60)} min`} · ${at.readingsToday} readings${at.medianGapS != null ? `, every ~${at.medianGapS} s` : ''}`
+      : 'Active today: not synced yet',
     `API key: ${key ? `saved (…${key.slice(-4)})` : 'none'}`,
     `Coach ${settings?.coachEnabled ? 'on' : 'off'} · check-in ${settings?.dailyCheckin ? 'on' : 'off'} (last ${settings?.lastCheckin ?? 'never'}) · share cycle ${settings?.coachShareCycle ? 'on' : 'off'}`,
   ];

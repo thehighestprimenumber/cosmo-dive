@@ -135,6 +135,22 @@ export const healthConnectSource: ActivitySource = {
     return [...periods, ...periodsFromDays(flowDays)];
   },
 
+  async getHeartRate(from: Date, to: Date): Promise<HrSample[]> {
+    await ensureInitialized();
+    const records = await readAll('HeartRate', from, to);
+    const seen = new Set<number>();
+    const out: HrSample[] = [];
+    for (const rec of records) {
+      for (const sample of rec.samples) {
+        const t = new Date(sample.time).getTime();
+        if (seen.has(t)) continue;
+        seen.add(t);
+        out.push({ t, bpm: sample.beatsPerMinute });
+      }
+    }
+    return out.sort((a, b) => a.t - b.t);
+  },
+
   async getNights(from: Date, to: Date): Promise<Night[]> {
     await ensureInitialized();
     // Start a day early so a night that began before `from` but ended inside it is included.
