@@ -1,6 +1,8 @@
 package com.dailyspark.wear
 
 import android.app.Activity
+import android.content.Intent
+import android.widget.Button
 import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
@@ -48,6 +50,11 @@ class MainActivity : Activity() {
             line(state.weekLine, 12f, "#A89C93")
             if (state.isStale) line("From ${state.date}: open the phone app to update.", 12f, "#FFB547")
         }
+        // The pace guide: today's brisk walk target, or just your pace.
+        column.addView(Button(this).apply {
+            text = if (state?.paceTarget != null && !state.isStale) "⚡ Pace guide" else "Pace guide"
+            setOnClickListener { startActivity(Intent(this@MainActivity, PaceActivity::class.java)) }
+        })
         setContentView(ScrollView(this).apply { addView(column) })
     }
 }

@@ -20,6 +20,9 @@ data class SparkState(
     val weekLine: String,
     val dots: List<String>,
     val todayIndex: Int,
+    /** Brisk walk today: target pace (seconds per km) and distance (m), for the pace guide. */
+    val paceTarget: Int? = null,
+    val paceMeters: Int? = null,
 ) {
     /** Built for an earlier day: the phone hasn't synced today yet. */
     val isStale: Boolean get() = date != LocalDate.now().toString()
@@ -43,6 +46,8 @@ data class SparkState(
                     weekLine = o.optString("weekLine"),
                     dots = List(dots?.length() ?: 0) { i -> dots!!.optString(i) },
                     todayIndex = o.optInt("todayIndex", -1),
+                    paceTarget = o.optJSONObject("pace")?.optInt("targetSPerKm")?.takeIf { it > 0 },
+                    paceMeters = o.optJSONObject("pace")?.optInt("meters")?.takeIf { it > 0 },
                 )
             } catch (e: Exception) {
                 null

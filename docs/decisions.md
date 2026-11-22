@@ -2,6 +2,16 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: pace guide on the watch
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| What | Watch app → "⚡ Pace guide": your pace over the last minute against today's brisk-walk target (sent by the phone with the Tile data), distance and time; works with the screen off | `PaceActivity`, `PaceGuideService`, `PaceCoach` in `wear/` |
+| Cues | Two long buzzes: slower than the target by more than 5%. One short: back on pace after a nudge. Three short: target distance done. No cues in the first 2 minutes, at most one every 45 s | Over the last minute, so a red light doesn't trigger it. Faster than the target is fine (the goal is "or faster") |
+| GPS | The watch's own GPS (fixes worse than 25 m and jumps faster than ~25 km/h are ignored). Needs location permission on the watch | |
+| Recording | It does **not** record a workout: record the walk with Samsung Health as usual, so it reaches Health Connect and counts for the goal. The guide runs alongside | Health Services workouts from our app wouldn't reach Samsung Health, so the walk wouldn't count |
+| No brisk walk today | The guide still shows your pace, without cues | |
+
 ## 2026-11-22: watch complication
 
 | Topic | Decision | Why / how to change |

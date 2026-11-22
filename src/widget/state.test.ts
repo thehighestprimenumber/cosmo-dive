@@ -37,4 +37,15 @@ describe('widget content', () => {
     expect(w.weekLine).toMatch(/this week · .* left/);
     expect(w.streak).toBe(snap.streak.current);
   });
+
+  it('sends the brisk walk target for the watch pace guide, until it’s done', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const snap = await refresh(db, source([]), settings, { now: new Date(2026, 10, 21, 8, 0) });
+    const brisk = { kind: 'brisk_walk' as const, meters: 3000, paceSPerKm: 630 };
+    const base = { ...snap, todayGoal: brisk, todayProgress: { value: 0, target: 3000, fraction: 0, done: false } };
+    expect(widgetStateFrom(base, settings).pace).toEqual({ targetSPerKm: 630, meters: 3000 });
+    expect(widgetStateFrom({ ...base, todayProgress: { ...base.todayProgress, done: true } }, settings).pace).toBeNull();
+    expect(widgetStateFrom(snap, settings).pace).toBeNull();
+  });
 });

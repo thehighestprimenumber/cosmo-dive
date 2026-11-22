@@ -26,6 +26,8 @@ export type WidgetState = {
   dots: (DayStatus | 'future')[];
   todayIndex: number;
   updatedAt: number;
+  /** Brisk walk today (not done yet): the target for the watch's pace guide. */
+  pace: { targetSPerKm: number; meters: number } | null;
 };
 
 export function widgetStateFrom(snap: Snapshot, settings: Settings): WidgetState {
@@ -58,6 +60,7 @@ export function widgetStateFrom(snap: Snapshot, settings: Settings): WidgetState
     climb: p?.ascent ? `⛰️ ${Math.round(p.ascent.value)} of ${p.ascent.target} m` : null,
     weekLine: `${formatKm(doneKm * 1000)} of ${formatKm(volume.km * 1000)} this week · ${formatKm(leftKm * 1000)} left`,
     dots: summary.days.map((d) => d.status),
+    pace: goal && goal.kind === 'brisk_walk' && !p?.done ? { targetSPerKm: goal.paceSPerKm, meters: goal.meters } : null,
     todayIndex: summary.days.findIndex((d) => d.date === snap.today),
     updatedAt: snap.syncedAt,
   };
