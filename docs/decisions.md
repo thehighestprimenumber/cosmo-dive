@@ -2,6 +2,15 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: guided strength session on the watch
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Flow | Watch app → "🦵 Fuerza guiada": one exercise at a time with sets and sides (derecha / izquierda), the main safety cue and the easier version on screen. Reps: tap "✓ Listo". Holds (balance, plank, stretches): a countdown. 30 s rest after each set, with a countdown that moves on by itself. A buzz at the end of every timer; "Saltar ejercicio" skips the rest of one | `StrengthActivity`, `StrengthPlan` in `wear/` |
+| Content | The same routine as the phone (sent with the Tile data), in Spanish | `watchRoutine()` |
+| Marked done | Finishing marks it done for today on the phone (+5 XP) at its next sync: the watch keeps the days in the Data Layer (`/strength-done`), the phone reads them before each sync. A day you untick on the phone isn't ticked again | `importWatchStrength` |
+| Health Connect | Not written yet (step 3 of the plan) | Next, if wanted |
+
 ## 2026-11-22: how to do each strength exercise
 
 | Topic | Decision | Why / how to change |

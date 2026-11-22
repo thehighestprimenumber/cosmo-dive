@@ -169,6 +169,8 @@ export type Settings = {
   /** Folder for the weekly automatic backup (Android folder address), if chosen. */
   backupFolder: string | null;
   lastAutoBackup: { at: number; ok: boolean; error?: string } | null;
+  /** Strength sessions from the watch already ticked here (so an untick sticks). */
+  watchStrengthImported: DateKey[];
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -200,6 +202,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   weatherDismissed: [],
   backupFolder: null,
   lastAutoBackup: null,
+  watchStrengthImported: [],
 };
 
 export type Progress = {

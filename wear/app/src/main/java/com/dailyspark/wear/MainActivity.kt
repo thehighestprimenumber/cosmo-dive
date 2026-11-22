@@ -50,6 +50,13 @@ class MainActivity : Activity() {
             line(state.weekLine, 12f, "#A89C93")
             if (state.isStale) line("From ${state.date}: open the phone app to update.", 12f, "#FFB547")
         }
+        // Guided strength & mobility (the routine comes from the phone).
+        if (state != null && state.routine.isNotEmpty()) {
+            column.addView(Button(this).apply {
+                text = if (state.strengthDone) "🦵 Fuerza ✓ (hecha hoy)" else "🦵 Fuerza guiada · ${state.strengthThisWeek} de 2"
+                setOnClickListener { startActivity(Intent(this@MainActivity, StrengthActivity::class.java)) }
+            })
+        }
         // The pace guide: today's brisk walk target, or just your pace.
         column.addView(Button(this).apply {
             text = if (state?.paceTarget != null && !state.isStale) "⚡ Pace guide" else "Pace guide"

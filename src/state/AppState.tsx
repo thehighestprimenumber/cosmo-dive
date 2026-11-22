@@ -11,6 +11,8 @@ import { afterSync } from '../services/afterSync';
 import { registerBackgroundSync } from '../services/backgroundSync';
 import { workCalendarFor } from '../services/calendar';
 import { weatherFor } from '../services/weather';
+import { importWatchStrength } from '../services/watchStrength';
+import { strengthDoneOnWatch } from '../../modules/wear-sync';
 import type { SourceStatus } from '../sources/ActivitySource';
 import { sourceFor } from '../sources';
 
@@ -58,6 +60,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           const status = await source.status();
           setSourceStatus(status);
           if (status.state !== 'ready') return;
+          await importWatchStrength(db, s, await strengthDoneOnWatch()).catch(() => []);
           const snap = await runRefresh(db, source, s, { ...opts, calendar: workCalendarFor(s), weather: weatherFor(db, s) });
           setSnapshot(snap);
           snapshotRef.current = snap;

@@ -1,4 +1,5 @@
 import { formatKm, formatValue, goalEmoji, goalTitle } from '../domain/format';
+import { watchRoutine } from '../domain/strength';
 import { weekSummary } from '../domain/summary';
 import type { DateKey, DayStatus, Settings } from '../domain/types';
 import type { Snapshot } from '../services/sync';
@@ -28,6 +29,8 @@ export type WidgetState = {
   updatedAt: number;
   /** Brisk walk today (not done yet): the target for the watch's pace guide. */
   pace: { targetSPerKm: number; meters: number } | null;
+  /** Strength & mobility: done today, and the routine for the watch's guided session. */
+  strength: { done: boolean; doneThisWeek: number; routine: ReturnType<typeof watchRoutine> };
 };
 
 export function widgetStateFrom(snap: Snapshot, settings: Settings): WidgetState {
@@ -60,6 +63,7 @@ export function widgetStateFrom(snap: Snapshot, settings: Settings): WidgetState
     climb: p?.ascent ? `⛰️ ${Math.round(p.ascent.value)} of ${p.ascent.target} m` : null,
     weekLine: `${formatKm(doneKm * 1000)} of ${formatKm(volume.km * 1000)} this week · ${formatKm(leftKm * 1000)} left`,
     dots: summary.days.map((d) => d.status),
+    strength: { done: snap.strength.today, doneThisWeek: snap.strength.thisWeek.length, routine: watchRoutine() },
     pace: goal && goal.kind === 'brisk_walk' && !p?.done ? { targetSPerKm: goal.paceSPerKm, meters: goal.meters } : null,
     todayIndex: summary.days.findIndex((d) => d.date === snap.today),
     updatedAt: snap.syncedAt,

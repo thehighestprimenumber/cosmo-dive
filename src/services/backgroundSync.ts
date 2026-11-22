@@ -7,6 +7,8 @@ import { sourceFor } from '../sources';
 import { afterSync } from './afterSync';
 import { workCalendarFor } from './calendar';
 import { weatherFor } from './weather';
+import { importWatchStrength } from './watchStrength';
+import { strengthDoneOnWatch } from '../../modules/wear-sync';
 import { refresh } from './sync';
 
 export const SYNC_TASK = 'daily-spark-sync';
@@ -30,6 +32,7 @@ TaskManager.defineTask(SYNC_TASK, async () => {
     const source = sourceFor(settings);
     if ((await source.status()).state !== 'ready') return BackgroundTask.BackgroundTaskResult.Failed;
 
+    await importWatchStrength(db, settings, await strengthDoneOnWatch()).catch(() => []);
     const snap = await refresh(db, source, settings, { calendar: workCalendarFor(settings), weather: weatherFor(db, settings) });
     await afterSync(db, settings, snap, { inBackground: true });
     await saveSettings(db, { lastBackgroundSync: Date.now() });

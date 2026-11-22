@@ -23,6 +23,8 @@ export type Exercise = {
   easier: string;
   /** What to search on YouTube to see it done. */
   video: string;
+  /** For the guided session on the watch: sets, and reps or seconds, per side if `sides`. */
+  guide: { sets: number; reps?: number; seconds?: number; sides: boolean };
 };
 
 /**
@@ -49,6 +51,7 @@ export const STRENGTH_ROUTINE: Exercise[] = [
     ],
     easier: 'Sentarte del todo en la silla y pararte, con ayuda de las manos en los muslos si hace falta.',
     video: 'sentadilla a la silla técnica correcta',
+    guide: { sets: 2, reps: 12, sides: false },
   },
   {
     id: 'stepup',
@@ -68,6 +71,7 @@ export const STRENGTH_ROUTINE: Exercise[] = [
     ],
     easier: 'Un escalón más bajo (o una tarima), siempre agarrada.',
     video: 'subir escalón step up ejercicio técnica',
+    guide: { sets: 2, reps: 10, sides: true },
   },
   {
     id: 'lunge',
@@ -86,6 +90,7 @@ export const STRENGTH_ROUTINE: Exercise[] = [
     ],
     easier: 'Con una mano en la pared o en el respaldo de una silla, y bajando poco.',
     video: 'estocada hacia atrás técnica correcta',
+    guide: { sets: 2, reps: 8, sides: true },
   },
   {
     id: 'calf',
@@ -103,6 +108,7 @@ export const STRENGTH_ROUTINE: Exercise[] = [
     ],
     easier: 'En el piso plano, con las dos manos en la pared.',
     video: 'elevación de talones en escalón técnica',
+    guide: { sets: 2, reps: 15, sides: false },
   },
   {
     id: 'balance',
@@ -117,6 +123,7 @@ export const STRENGTH_ROUTINE: Exercise[] = [
     careful: ['Siempre con algo cerca para agarrarte.'],
     easier: 'Con un dedo apoyado en la pared.',
     video: 'ejercicio equilibrio en un pie tobillo propiocepción',
+    guide: { sets: 1, seconds: 30, sides: true },
   },
   {
     id: 'sideplank',
@@ -135,6 +142,7 @@ export const STRENGTH_ROUTINE: Exercise[] = [
     ],
     easier: 'Con las rodillas apoyadas y menos tiempo (10–15 s).',
     video: 'plancha lateral con rodillas apoyadas técnica',
+    guide: { sets: 1, seconds: 25, sides: true },
   },
   {
     id: 'stretch',
@@ -148,6 +156,7 @@ export const STRENGTH_ROUTINE: Exercise[] = [
     careful: ['Tensión suave, sin rebotes; nunca dolor.'],
     easier: 'Menos profundidad: con sentir un poco alcanza.',
     video: 'estiramiento flexor de cadera de rodillas y gemelo en la pared',
+    guide: { sets: 2, seconds: 30, sides: true },
   },
 ];
 
@@ -162,4 +171,15 @@ export const SAFETY_NOTE =
 export function strengthDaysIn(days: DateKey[], monday: DateKey): DateKey[] {
   const end = addDays(monday, 6);
   return days.filter((d) => d >= monday && d <= end);
+}
+
+/** The routine as the watch needs it (sent with the Tile data). */
+export function watchRoutine() {
+  return STRENGTH_ROUTINE.map((e) => ({
+    id: e.id,
+    name: e.name,
+    cue: e.careful[0],
+    easier: e.easier,
+    ...e.guide,
+  }));
 }

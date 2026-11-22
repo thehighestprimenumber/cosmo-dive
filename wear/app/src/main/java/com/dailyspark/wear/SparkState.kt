@@ -23,6 +23,10 @@ data class SparkState(
     /** Brisk walk today: target pace (seconds per km) and distance (m), for the pace guide. */
     val paceTarget: Int? = null,
     val paceMeters: Int? = null,
+    /** Strength & mobility: done today, sessions this week, and the routine for the guided session. */
+    val strengthDone: Boolean = false,
+    val strengthThisWeek: Int = 0,
+    val routine: List<Exercise> = emptyList(),
 ) {
     /** Built for an earlier day: the phone hasn't synced today yet. */
     val isStale: Boolean get() = date != LocalDate.now().toString()
@@ -48,6 +52,9 @@ data class SparkState(
                     todayIndex = o.optInt("todayIndex", -1),
                     paceTarget = o.optJSONObject("pace")?.optInt("targetSPerKm")?.takeIf { it > 0 },
                     paceMeters = o.optJSONObject("pace")?.optInt("meters")?.takeIf { it > 0 },
+                    strengthDone = o.optJSONObject("strength")?.optBoolean("done") ?: false,
+                    strengthThisWeek = o.optJSONObject("strength")?.optInt("doneThisWeek") ?: 0,
+                    routine = Exercise.parseList(o.optJSONObject("strength")?.optJSONArray("routine")),
                 )
             } catch (e: Exception) {
                 null
