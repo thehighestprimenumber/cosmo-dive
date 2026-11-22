@@ -116,7 +116,8 @@ describe('refresh', () => {
     const db = fakeDb();
     await migrate(db);
     // Mon 9 – Fri 13 Nov: walk Mon, nothing Tue–Thu, walk Fri. Two rest days per week.
-    const acts = [walk('2026-11-09', 300), walk('2026-11-13', 300)];
+    // (Monday's walk isn't big enough for a recovery day.)
+    const acts = [walk('2026-11-09', 70), walk('2026-11-13', 300)];
     const snap = await refresh(db, sourceOf(acts), { ...settings, startDate: '2026-11-09' }, {
       now: new Date(2026, 10, 13, 20, 0),
     });
@@ -326,7 +327,34 @@ describe('refresh', () => {
       const tue = await refresh(db, sourceOf(withKayakishMonday), s, { now: at(addDays(MON, 1), 9) });
       expect(tue.week.doneKm).toBe(15);
       expect(tue.todayNotes[0]).not.toBe(plannedNote);
-      expect(tue.todayNotes[0]).toContain('15 done so far');
+      expect(tue.todayNotes.join(' ')).toContain('15 done so far');
+    });
+
+    it('the day after a very big day is a recovery day: resting costs no rest day', async () => {
+      const db = fakeDb();
+      await migrate(db);
+      const big = [...history, { ...walk(MON, 170), distanceM: 14000 }];
+      const tue = await refresh(db, sourceOf(big), s, { now: at(addDays(MON, 1), 9) });
+      expect(tue.todayRecovery).toBe(true);
+      expect(tue.todayGoal).toEqual({ kind: 'duration', seconds: 20 * 60 });
+      expect(tue.todayNotes[0]).toContain('Recovery day: yesterday you walked 14 km');
+      // You rested on Tuesday: it's a rest day, and the week's rest day is still there.
+      const wed = await refresh(db, sourceOf(big), s, { now: at(addDays(MON, 2), 9) });
+      expect(wed.days.get(addDays(MON, 1))?.status).toBe('rest');
+      expect(wed.streak.restLeftThisWeek).toBe(1);
+      expect(wed.todayRecovery).toBe(false);
+      // Picking a goal type yourself means you want to move: a normal goal.
+      const db2 = fakeDb();
+      await migrate(db2);
+      const chosen = await refresh(db2, sourceOf(big), s, { now: at(addDays(MON, 1), 9), todayKind: 'distance' });
+      expect(chosen.todayRecovery).toBe(false);
+    });
+
+    it('a normal day is not a recovery day', async () => {
+      const db = fakeDb();
+      await migrate(db);
+      const tue = await refresh(db, sourceOf(history), s, { now: at(addDays(MON, 1), 9) });
+      expect(tue.todayRecovery).toBe(false);
     });
 
     it('your period week is the light week', async () => {

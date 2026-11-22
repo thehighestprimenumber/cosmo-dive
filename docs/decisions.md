@@ -2,6 +2,19 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: recovery day after a very big day
+
+The owner expected the app to say "rest" the day after a huge walk.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| When | The day after a day with at least 1.75× a regular day's share of the week **and** at least 6 km (all walking of the day, workouts or not). Only on regular days: a key session planned for today stays | `recoveryAfter` in `src/domain/recovery.ts` |
+| What it says | "🛌 Recovery day": rest, or an easy 20-minute stroll if you feel like moving. The goal shown is the 20 minutes | |
+| Streak | Resting on a recovery day is a rest day that **doesn't use** one of the week's rest days | Rest after a big effort is part of training, not a skip. `computeStreak` |
+| Picking a goal type | If you pick Distance / Time / Heart rate on a recovery day, you get a normal goal | You want to move |
+| A session that slid onto today | A missed key session that slid onto a recovery day slides on to the next free day (or is dropped on Sunday) | A brisk walk the day after a huge walk isn't wise |
+| Rules version | `PLAN_VERSION` 9: today's goal is redone on update unless already completed | |
+
 ## 2026-11-21: cycle details on the Week tab
 
 | Topic | Decision | Why / how to change |

@@ -31,6 +31,7 @@ import {
 import { planVolume, rebalancedDayKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
 import { generateKeySession } from '../domain/sessions';
 import { withCoachFactor } from '../domain/coach';
+import { recoveryAfter } from '../domain/recovery';
 import { aimSuggestion, dailyAverageKm, walkingPace } from '../domain/aim';
 import {
   aimMonthTarget,
@@ -74,6 +75,8 @@ export type Snapshot = {
   /** When you usually start moving, learned from the last 4 weeks. */
   usualTime: TimeOfDay | null;
   todayBoss: boolean;
+  /** Today is a recovery day after a very big day. */
+  todayRecovery: boolean;
   /** This week's km: planned, done, left, last week's, and each session's share. */
   week: {
     volume: WeekVolume;
@@ -304,6 +307,16 @@ export async function refresh(
           ? split.b2bKm
           : split.trekKm;
 
+  // After a very big day, a key session that only slid onto today (missed earlier) slides on, or is dropped.
+  const slid = sessionOn(plan, today);
+  if (slid && isMovable(slid) && slid.day !== slid.plannedDay && !doneOn(today)) {
+    const y = addDays(today, -1);
+    if (recoveryAfter(weekKm(activities, y, rf, y), splitOf(plan).regularDayKm)) {
+      const to = freeDays(plan, today, true, slid.id)[0];
+      plan = to ? moveSession(plan, slid.id, to, today, true) : dropSession(plan, slid.id);
+      await saveWeekPlan(db, plan);
+    }
+  }
   // Today's goal must match the plan: a key session if one is on today, a regular goal otherwise.
   const todaysKey = sessionOn(plan, today);
   const wantKey = todaysKey ? goalKindOf(todaysKey.kind) : undefined;
@@ -369,6 +382,7 @@ export async function refresh(
             `This week: ${volume.km} km (${Math.round(doneKm * 10) / 10} done so far). Today’s share: ${dayKm} km.`,
             ...volume.notes,
           ];
+          const yesterday = addDays(date, -1);
           daily = generateGoal({
             date,
             settings,
@@ -379,6 +393,7 @@ export async function refresh(
             kind,
             dayKm,
             planNotes,
+            recoveryNotes: recoveryAfter(weekKm(activities, yesterday, rf, yesterday), split.regularDayKm),
             light: !!volume.light,
             aerobic: isAerobicPhase(date, settings.event),
           });
@@ -468,6 +483,7 @@ export async function refresh(
       newlyUnlocked,
     },
     todayBoss: !!goals.get(today)?.meta?.boss,
+    todayRecovery: !!goals.get(today)?.meta?.recovery,
     plan,
     nextPlan,
     week: (() => {

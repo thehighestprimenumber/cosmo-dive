@@ -24,7 +24,7 @@ Daily Spark reads the walks and rides your Galaxy Watch records (Samsung Health 
   - **Aim (optional, Settings)**: an average of N km a day over *every* day, rest days included. A training day then needs N × 7 ÷ training days (with 2 rest days, 5 km/day → 7 km). Goals start at 60% of that at least, go up 10% each time you complete one of the same type, and stop at the aim. Time goals use your walking pace. The monthly challenge becomes at least N × days in the month. Today shows your real 14-day average next to the aim. Once that average reaches the aim, Today offers to raise it (+10%, rounded to 0.5 km). "Not now" asks again in a week, and the background sync notifies you once per aim.
   - Each goal type goes up at most +7% a week, when you've been hitting it.
   - Missing two training days in a row (beyond your rest days) eases the next goal by 15%.
-  - The day after a big effort (150%+ of the goal), the goal is 10% lighter.
+  - 🛌 **Recovery day**: the day after a very big day (1.75× a usual day and 6+ km), Today says to rest, or take an easy 20-minute stroll. Resting on it doesn't use one of your rest days.
   - Every 4th week is a recovery week at 80%.
   - Goals stay between 80% and 150% of your typical day.
   - **Readiness** (optional sleep permission): after a short night (under 5.5 h, or 20% below your usual) or a resting heart rate 5+ bpm above your 2-week usual, today's goal is 15% lighter. Well rested with a low resting heart rate: 5% harder. A goal made before you woke up is redone once last night's sleep syncs (unless you've already done it). These tweaks apply to today only and never lower the plan.

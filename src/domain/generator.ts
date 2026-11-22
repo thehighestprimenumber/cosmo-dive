@@ -1,6 +1,7 @@
 import { addDays, daysBetween, mondayOf, toDateKey } from './dates';
 import { formatKm, formatMinutes, formatPace } from './format';
 import { AEROBIC_ZONE_SHARE } from './aerobic';
+import { RECOVERY_MINUTES } from './recovery';
 import { AIM_START, AIM_STEP, aimPerTrainingDay, walkingPace } from './aim';
 import { BOSS_FACTOR, isBossDay, XP } from './game';
 import { measure } from './progress';
@@ -24,7 +25,7 @@ import type {
  * that created them, so old history never gets silently reinterpreted, and
  * goals from older versions are never used as a starting point.
  */
-export const PLAN_VERSION = 8;
+export const PLAN_VERSION = 9;
 
 /** How far back "your typical day" looks. */
 export const LOOKBACK_DAYS = 90;
@@ -83,6 +84,8 @@ export type GeneratorInput = {
   light?: boolean;
   /** Aerobic-base phase (event at altitude): more Zone 2 days, longer in zone. */
   aerobic?: boolean;
+  /** Yesterday was a very big day: today is a recovery day (these notes explain why). */
+  recoveryNotes?: string[] | null;
 };
 
 /** Heart-rate goals ask for this share of the day's time in the zone. */
@@ -101,6 +104,7 @@ export function generateGoal({
   planNotes = [],
   light,
   aerobic,
+  recoveryNotes,
 }: GeneratorInput): DailyGoal {
   const windowStart = addDays(date, -LOOKBACK_DAYS);
   const recent = activities.filter((a) => {
@@ -124,6 +128,15 @@ export function generateGoal({
     spec = { kind, seconds: 0 };
   }
   const notes: string[] = [];
+  // A recovery day, unless you picked a goal type yourself (then you want to move).
+  if (dayKm != null && recoveryNotes && !chosenKind) {
+    return {
+      date,
+      goal: { kind: 'duration', seconds: RECOVERY_MINUTES * 60 },
+      planVersion: PLAN_VERSION,
+      meta: { base: RECOVERY_MINUTES * 60, notes: [...recoveryNotes, ...planNotes], readiness: readiness?.level ?? 'unknown', recovery: true },
+    };
+  }
   if (dayKm != null) {
     return fromWeeklyPlan({ date, spec, dayKm, recent, readiness, chosen: !!chosenKind, planNotes, light, aerobic });
   }

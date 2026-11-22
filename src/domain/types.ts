@@ -78,6 +78,8 @@ export type GoalMeta = {
   readiness?: 'low' | 'normal' | 'high' | 'unknown';
   /** A weekly boss day: harder, worth more XP. */
   boss?: boolean;
+  /** The day after a very big day: resting is fine and doesn't use a rest day. */
+  recovery?: boolean;
   /** Brisk walk: the pace level (s/km) before today-only tweaks. */
   pace?: number;
 };

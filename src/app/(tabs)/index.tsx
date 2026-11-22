@@ -136,7 +136,7 @@ export default function TodayScreen() {
         )}
         {goal && progress && (
           <Card style={done ? { borderColor: colors.done } : undefined}>
-            <Text style={styles.label}>{snapshot.todayBoss ? '⚔️ Boss day' : 'Today’s goal'}</Text>
+            <Text style={styles.label}>{snapshot.todayRecovery ? '🛌 Recovery day' : snapshot.todayBoss ? '⚔️ Boss day' : 'Today’s goal'}</Text>
             <Text style={styles.h2}>
               {goalEmoji(goal)} {goalTitle(goal, settings)}
             </Text>
@@ -154,7 +154,13 @@ export default function TodayScreen() {
                 ⛰️ {Math.round(progress.ascent.value)} of {progress.ascent.target} m climbed (in the same walk)
               </Text>
             )}
-            {!done && streak && (
+            {snapshot.todayRecovery && !done && (
+              <Text style={[styles.body, { marginTop: 4 }]}>
+                Yesterday was a big one. Rest today, or take an easy stroll if you feel like moving: resting doesn’t use a
+                rest day or touch your streak.
+              </Text>
+            )}
+            {!done && streak && !snapshot.todayRecovery && (
               <Text style={[styles.hint, { marginTop: 8 }]}>
                 {streak.restLeftThisWeek > 0
                   ? `Not today? Skipping uses 1 of your ${streak.restLeftThisWeek} rest day${streak.restLeftThisWeek === 1 ? '' : 's'} left this week — no streak lost.`

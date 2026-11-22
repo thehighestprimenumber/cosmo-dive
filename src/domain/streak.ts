@@ -29,6 +29,8 @@ export type StreakState = {
  * - Every 7 completed days earns a freeze (max 2).
  * - Today is never rest or missed while it is still in progress.
  * - Old fixed rest days (goal: null, plans v1–v2) are always rest days.
+ * - A recovery day (the day after a very big day) not done is a rest day
+ *   that doesn't use up the week's rest days.
  */
 export function computeStreak(days: DayResult[], today: DateKey, restDaysPerWeek: number): StreakState {
   const sorted = [...days].filter((d) => d.date <= today).sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -53,6 +55,9 @@ export function computeStreak(days: DayResult[], today: DateKey, restDaysPerWeek
       }
     } else if (day.date === today && day.goal) {
       statuses.set(day.date, 'pending');
+    } else if (day.meta?.recovery) {
+      // A recovery day after a very big day: resting is part of the plan.
+      statuses.set(day.date, 'rest');
     } else if (!day.goal || used < restDaysPerWeek) {
       statuses.set(day.date, 'rest');
       restUsed.set(week, used + 1);
