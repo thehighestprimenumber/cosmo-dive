@@ -2,6 +2,15 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: guided strength session on the phone too
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Start | Today → Strength & mobility → "▶ Start guided session" (the old button becomes "Already did it: mark done") | `src/app/strength.tsx` |
+| Flow | Same as the watch: one exercise per screen with set and side, reps ("✓ Listo") or a countdown for holds ("▶ Empezar"), 30 s rests that count down and move on by themselves, "Saltar ejercicio". Vibrates at the end of each timer; the screen stays on | `sessionSteps` in `src/domain/strengthSession.ts` |
+| Help on screen | The main safety cue always; "Cómo se hace" opens the steps, the rest of the cues, the easier version and the video search | |
+| Finish | Ticks today off (+5 XP) | |
+
 ## 2026-11-22: unrecorded walking counts for time goals; duplicate sessions count once
 
 From the owner's screenshots (22 Nov): Samsung showed 2.04 km and 15 active minutes, Daily Spark's 20-minute recovery goal showed 0 min; the week showed 22.6 km but today's goal note said "41.2 done so far".

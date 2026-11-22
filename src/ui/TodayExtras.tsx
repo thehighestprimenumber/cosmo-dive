@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
@@ -91,9 +92,10 @@ export function StrengthCard() {
           <Text style={[styles.hint, { marginTop: 8 }]}>⚠️ {SAFETY_NOTE}</Text>
         </View>
       )}
+      {!today && <Button title="▶ Start guided session" onPress={() => router.push('/strength')} />}
       <Button
-        title={today ? '✓ Done today (undo)' : 'Done today'}
-        variant={today ? 'secondary' : 'primary'}
+        variant="secondary"
+        title={today ? '✓ Done today (undo)' : 'Already did it: mark done'}
         onPress={toggle}
         disabled={busy}
       />
