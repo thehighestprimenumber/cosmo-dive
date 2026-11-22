@@ -73,6 +73,23 @@
       "./plugins/withAbiSplits",
       "expo-calendar",
       "./plugins/withBackupRules"
-    ]
+    ],
+    "owner": "thehighestprimenumbers-team",
+    "extra": {
+      "eas": {
+        "projectId": "2c1f26a9-bbe0-45ea-85cf-3c1159569981"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2c1f26a9-bbe0-45ea-85cf-3c1159569981",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      },
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    }
   }
 }
