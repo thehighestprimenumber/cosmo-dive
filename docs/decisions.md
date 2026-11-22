@@ -2,6 +2,17 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: how to do each strength exercise
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Content | Each exercise (tap it on the Strength & mobility card): what it's for, steps, "Cuidado" cues, an easier version to start, and "▶ Ver cómo se hace" | The owner doesn't know some exercises and wants to avoid injury. `STRENGTH_ROUTINE` in `src/domain/strength.ts` |
+| Language | Spanish for the instructions (the rest of the app stays English) | Technique cues are about safety |
+| Videos | A YouTube search for the exercise, not a fixed video | Fixed links break or can't be checked from here; a search always works and lets the owner pick a teacher (ideally a physio or certified trainer) |
+| Easier versions | Sit-to-stand on a chair, low step with the rail, lunges holding a wall, calf raises on flat ground, balance with a finger on the wall, side plank on the knees | Start safe, progress later |
+| Safety | Stop with sharp, joint or next-day pain; see a physio with a previous injury; the coach can explain technique | |
+| Illustrations | Not drawn: a wrong drawing teaches wrong form | Videos instead |
+
 ## 2026-11-22: pace guide on the watch
 
 | Topic | Decision | Why / how to change |

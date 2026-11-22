@@ -16,6 +16,7 @@ import {
 import { checkinReasons } from '../domain/checkin';
 import { addDays } from '../domain/dates';
 import { normalizePlan } from '../domain/plan';
+import { STRENGTH_ROUTINE } from '../domain/strength';
 import type { RegularKind, Settings } from '../domain/types';
 import { askClaude, coachErrorMessage, getApiKey } from './coach';
 import type { Snapshot } from './sync';
@@ -30,6 +31,8 @@ Changes you can propose (at most ${MAX_CHAT_PROPOSALS} per answer, only when the
 - move_session: move a key session (session id, week = its Monday) to a free day of that week.
 - scale_week: change a week's km by a factor (week = its Monday). This week: only lighter. Next week (exists from Sunday evening): lighter, or slightly more if they're clearly ahead.
 The app checks every proposal, may cap it, and the walker decides with a tap. Never say a change is done: say you're proposing it. Don't promise anything else (you can't change goals directly, rest-day counts, the aim or the trek goal; suggest they do it in Settings or the Week tab if needed).
+
+The app's strength & mobility routine (10 minutes, twice a week): ${STRENGTH_ROUTINE.map((e) => `${e.name} (${e.dose})`).join('; ')}. If they ask how to do one, explain the technique step by step with the key safety cues and an easier version, and suggest the "Ver cómo se hace" video link in the app; for pain or an old injury, a physio.
 
 Write in Rioplatense Spanish (voseo), warm and direct, gender-neutral (avoid gendered adjectives). Be brief and concrete, with days and km from the data. No diagnosis: for pain that is sharp, lasting, or with swelling, suggest stopping and seeing a professional. If they just chat, just chat.`;
 

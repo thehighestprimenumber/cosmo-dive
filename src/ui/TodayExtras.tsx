@@ -1,10 +1,10 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 import { saveFeeling, setExtra } from '../data/db';
 import { RPE_LABELS } from '../domain/effort';
 import type { SessionKind } from '../domain/plan';
-import { STRENGTH_PER_WEEK, STRENGTH_ROUTINE, STRENGTH_XP } from '../domain/strength';
+import { SAFETY_NOTE, STRENGTH_PER_WEEK, STRENGTH_ROUTINE, STRENGTH_XP, videoUrl, type Exercise } from '../domain/strength';
 import { useApp } from '../state/AppState';
 import { Button, Card, Label, styles } from './components';
 import { colors } from './theme';
@@ -83,12 +83,14 @@ export function StrengthCard() {
           <Text style={{ color: colors.accent }}>{open ? 'Hide' : 'Show'} the routine</Text>
         </Text>
       </Pressable>
-      {open &&
-        STRENGTH_ROUTINE.map((x) => (
-          <Text key={x.name} style={[styles.body, { marginTop: 6 }]}>
-            • <Text style={{ fontWeight: '700' }}>{x.name}</Text>: {x.how}
-          </Text>
-        ))}
+      {open && (
+        <View style={{ marginTop: 6 }}>
+          {STRENGTH_ROUTINE.map((x) => (
+            <ExerciseView key={x.id} exercise={x} />
+          ))}
+          <Text style={[styles.hint, { marginTop: 8 }]}>⚠️ {SAFETY_NOTE}</Text>
+        </View>
+      )}
       <Button
         title={today ? '✓ Done today (undo)' : 'Done today'}
         variant={today ? 'secondary' : 'primary'}
@@ -96,5 +98,41 @@ export function StrengthCard() {
         disabled={busy}
       />
     </Card>
+  );
+}
+
+/** One exercise: tap for how to do it, what to watch out for, an easier version and a video. */
+function ExerciseView({ exercise: x }: { exercise: Exercise }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ borderTopWidth: 1, borderTopColor: colors.cardBorder, paddingVertical: 8 }}>
+      <Pressable onPress={() => setOpen((o) => !o)} hitSlop={6}>
+        <Text style={styles.body}>
+          <Text style={{ fontWeight: '700' }}>{x.name}</Text> · {x.dose} <Text style={{ color: colors.accent }}>{open ? '▴' : '▾'}</Text>
+        </Text>
+        <Text style={styles.hint}>{x.why}</Text>
+      </Pressable>
+      {open && (
+        <View style={{ marginTop: 6 }}>
+          <Text style={styles.label}>Cómo</Text>
+          {x.steps.map((st, i) => (
+            <Text key={i} style={[styles.body, { marginBottom: 4 }]}>
+              {i + 1}. {st}
+            </Text>
+          ))}
+          <Text style={[styles.label, { marginTop: 6 }]}>Cuidado</Text>
+          {x.careful.map((c, i) => (
+            <Text key={i} style={[styles.body, { marginBottom: 4 }]}>
+              • {c}
+            </Text>
+          ))}
+          <Text style={[styles.label, { marginTop: 6 }]}>Más fácil para empezar</Text>
+          <Text style={styles.body}>{x.easier}</Text>
+          <Pressable onPress={() => Linking.openURL(videoUrl(x))} hitSlop={6} style={{ marginTop: 8 }}>
+            <Text style={[styles.body, { color: colors.accent, fontWeight: '700' }]}>▶ Ver cómo se hace (YouTube)</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
   );
 }
