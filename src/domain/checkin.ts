@@ -26,6 +26,8 @@ export type CheckinInput = {
   streak: number;
   /** When you last wrote to the coach (epoch ms), if ever. */
   lastUserMessageAt: number | null;
+  /** How hard yesterday's key session felt, if rated. */
+  yesterdayFelt?: number | null;
   now: Date;
 };
 
@@ -33,6 +35,7 @@ export type CheckinInput = {
 export function checkinReasons(i: CheckinInput): string[] {
   const reasons: string[] = [];
   if (i.todayRecovery) reasons.push('Yesterday was a very big day: today is a recovery day.');
+  if (i.yesterdayFelt != null && i.yesterdayFelt >= 9) reasons.push(`Yesterday's key walk felt ${i.yesterdayFelt}/10.`);
   if (i.todayReadiness === 'low') reasons.push('Readiness is low today (short night or raised resting heart rate).');
 
   const missed = (d: DateKey) => {

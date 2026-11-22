@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { DailyGoal, DateKey, Settings } from '../domain/types';
-import { clearResults, insertGoal, loadGoals, loadSettings, saveSettings } from './db';
+import { clearResults, insertGoal, loadExtras, loadFeelings, loadGoals, loadSettings, saveFeeling, saveSettings, setExtra, type ExtraKind } from './db';
 
 /**
  * Goal history is the one thing Health Connect can't rebuild, so it can be
@@ -13,6 +13,10 @@ export type Backup = {
   exportedAt: string;
   settings: Pick<Settings, 'restDaysPerWeek' | 'rideFactor' | 'maxHr' | 'morningReminder' | 'eveningReminder' | 'startDate'>;
   goals: DailyGoal[];
+  /** How hard key sessions felt (added later; optional in older files). */
+  feelings?: { date: DateKey; rpe: number }[];
+  /** Strength & mobility sessions ticked off (optional in older files). */
+  extras?: { date: DateKey; kind: ExtraKind }[];
 };
 
 export async function buildBackup(db: SQLiteDatabase, today: DateKey): Promise<Backup> {
@@ -30,6 +34,8 @@ export async function buildBackup(db: SQLiteDatabase, today: DateKey): Promise<B
       startDate: s.startDate,
     },
     goals: await loadGoals(db, '0000-01-01', '9999-12-31'),
+    feelings: [...(await loadFeelings(db, '0000-01-01', '9999-12-31'))].map(([date, rpe]) => ({ date, rpe })),
+    extras: await loadExtras(db, '0000-01-01', '9999-12-31'),
   };
 }
 
@@ -67,6 +73,11 @@ export async function restoreBackup(db: SQLiteDatabase, backup: Backup, today: D
   const current = await loadSettings(db, today);
   const before = (await loadGoals(db, '0000-01-01', '9999-12-31')).length;
   for (const g of backup.goals) await insertGoal(db, g);
+  const known = await loadFeelings(db, '0000-01-01', '9999-12-31');
+  for (const f of backup.feelings ?? []) {
+    if (DATE_RE.test(f.date) && f.rpe >= 1 && f.rpe <= 10 && !known.has(f.date)) await saveFeeling(db, f.date, f.rpe);
+  }
+  for (const x of backup.extras ?? []) if (DATE_RE.test(x.date) && x.kind === 'strength') await setExtra(db, x.date, x.kind, true);
   const after = (await loadGoals(db, '0000-01-01', '9999-12-31')).length;
 
   const startDate = current.onboarded && current.startDate < backup.settings.startDate

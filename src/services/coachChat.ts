@@ -14,6 +14,7 @@ import {
   type ChatProposal,
 } from '../domain/coachChat';
 import { checkinReasons } from '../domain/checkin';
+import { addDays } from '../domain/dates';
 import { normalizePlan } from '../domain/plan';
 import type { RegularKind, Settings } from '../domain/types';
 import { askClaude, coachErrorMessage, getApiKey } from './coach';
@@ -66,6 +67,8 @@ function contextFor(snap: Snapshot, settings: Settings, now: Date) {
     },
     settings,
     nextPeriodStart: snap.cycle?.next?.start ?? null,
+    feelings: snap.feelings,
+    strengthThisWeek: snap.strength.thisWeek.length,
   });
 }
 
@@ -210,6 +213,7 @@ export async function runDailyCheckin(
     restLeftThisWeek: snap.streak.restLeftThisWeek,
     streak: snap.streak.current,
     lastUserMessageAt: lastUser?.at ?? null,
+    yesterdayFelt: snap.feelings[addDays(snap.today, -1)] ?? null,
     now,
   });
   if (!reasons.length || snap.todayProgress?.done) return null;

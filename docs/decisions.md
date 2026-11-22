@@ -2,6 +2,17 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: how it felt (1–10) and strength & mobility
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| When it asks | On Today, after a key session (long walk, brisk walk, back-to-back day, trek day) is done, today or yesterday: one tap, 1–10. Only key sessions, so it doesn't nag every day | `sessionToRate` in `src/domain/effort.ts` |
+| What 9–10 changes | Next week's km **hold** instead of growing ("A key walk last week felt 9/10: holding steady"); the next brisk walk keeps the same pace. The morning check-in fires the day after a 9–10 | `planVolume`, `generateKeySession`, `checkinReasons`. Rules version 10 |
+| The coach | Sees each day's rating and the strength sessions this week | |
+| Strength & mobility | 10 minutes, any 2 days a week, ticked off on Today (the watch can't see it). Routine for trail legs: squats, step-ups, reverse lunges, calf raises, single-leg balance, side plank, stretches. +5 XP each; never affects the streak or goals. The card hides once 2 are done that week | `src/domain/strength.ts` |
+| Storage | New tables `feelings` and `extras` (DB v6), included in the history export/import | |
+| Watch | Rating from the watch: later, with the next watch update | |
+
 ## 2026-11-22: smaller APK
 
 | Topic | Decision | Why / how to change |

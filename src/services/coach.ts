@@ -122,6 +122,7 @@ export async function runWeeklyReview(
     streak: { current: snap.streak.current, longest: snap.streak.longest, freezes: snap.streak.freezes },
     settings,
     nextPeriodStart: snap.cycle?.next?.start ?? null,
+    feelings: snap.feelings,
   });
   let record: CoachRecord;
   try {

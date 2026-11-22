@@ -50,6 +50,18 @@ const MIGRATIONS: string[] = [
      at INTEGER NOT NULL,
      data TEXT NOT NULL
    );`,
+  // v6: how hard key sessions felt (1–10), and extras you tick off (strength & mobility).
+  `CREATE TABLE feelings (
+     date TEXT PRIMARY KEY NOT NULL,
+     rpe INTEGER NOT NULL,
+     at INTEGER NOT NULL
+   );
+   CREATE TABLE extras (
+     date TEXT NOT NULL,
+     kind TEXT NOT NULL,
+     at INTEGER NOT NULL,
+     PRIMARY KEY (date, kind)
+   );`,
 ];
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {
@@ -212,4 +224,36 @@ export async function saveChatMessage(db: SQLiteDatabase, m: ChatMessage): Promi
 
 export async function clearChat(db: SQLiteDatabase): Promise<void> {
   await db.runAsync('DELETE FROM coach_chat');
+}
+
+// ---- how it felt (1–10) ----
+
+export async function loadFeelings(db: SQLiteDatabase, from: DateKey, to: DateKey): Promise<Map<DateKey, number>> {
+  const rows = await db.getAllAsync<{ date: string; rpe: number }>(
+    'SELECT date, rpe FROM feelings WHERE date >= ? AND date <= ?',
+    from,
+    to,
+  );
+  return new Map(rows.map((r) => [r.date, r.rpe]));
+}
+
+export async function saveFeeling(db: SQLiteDatabase, date: DateKey, rpe: number): Promise<void> {
+  await db.runAsync('INSERT OR REPLACE INTO feelings (date, rpe, at) VALUES (?, ?, ?)', date, rpe, Date.now());
+}
+
+// ---- extras (strength & mobility) ----
+
+export type ExtraKind = 'strength';
+
+export async function loadExtras(db: SQLiteDatabase, from: DateKey, to: DateKey): Promise<{ date: DateKey; kind: ExtraKind }[]> {
+  return db.getAllAsync<{ date: string; kind: ExtraKind }>(
+    'SELECT date, kind FROM extras WHERE date >= ? AND date <= ? ORDER BY date',
+    from,
+    to,
+  );
+}
+
+export async function setExtra(db: SQLiteDatabase, date: DateKey, kind: ExtraKind, done: boolean): Promise<void> {
+  if (done) await db.runAsync('INSERT OR REPLACE INTO extras (date, kind, at) VALUES (?, ?, ?)', date, kind, Date.now());
+  else await db.runAsync('DELETE FROM extras WHERE date = ? AND kind = ?', date, kind);
 }

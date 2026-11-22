@@ -13,6 +13,7 @@ import { ACHIEVEMENTS } from '../../domain/game';
 import { sourceFor } from '../../sources';
 import { useApp } from '../../state/AppState';
 import { Button, Card, ProgressBar, styles } from '../../ui/components';
+import { RateCard, StrengthCard } from '../../ui/TodayExtras';
 import { colors, STATUS_COLOR } from '../../ui/theme';
 
 export default function TodayScreen() {
@@ -208,6 +209,8 @@ export default function TodayScreen() {
             )}
           </Card>
         )}
+        <RateCard />
+        <StrengthCard />
         {settings.coachEnabled && snapshot && <CoachNote today={snapshot.today} syncedAt={snapshot.syncedAt} />}
         {goal === undefined && !syncing && snapshot && (
           <Card>

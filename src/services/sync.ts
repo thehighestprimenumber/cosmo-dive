@@ -5,6 +5,8 @@ import {
   lastGoalDate,
   loadGoals,
   loadResults,
+  loadExtras,
+  loadFeelings,
   loadWeekPlan,
   saveResults,
   saveSettings,
@@ -26,8 +28,11 @@ import {
   planWeek,
   sessionOn,
   type KeySession,
+  type SessionKind,
   type WeekPlan,
 } from '../domain/plan';
+import { hardestIn, sessionToRate } from '../domain/effort';
+import { STRENGTH_XP, strengthDaysIn } from '../domain/strength';
 import { planVolume, rebalancedDayKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
 import { generateKeySession } from '../domain/sessions';
 import { withCoachFactor } from '../domain/coach';
@@ -77,6 +82,12 @@ export type Snapshot = {
   todayBoss: boolean;
   /** Today is a recovery day after a very big day. */
   todayRecovery: boolean;
+  /** Your 1–10 ratings of key sessions, last week and this week. */
+  feelings: Record<DateKey, number>;
+  /** A key session done today or yesterday, waiting for "how did it feel?". */
+  toRate: { date: DateKey; kind: SessionKind } | null;
+  /** Strength & mobility sessions ticked off this week, and whether today. */
+  strength: { thisWeek: DateKey[]; today: boolean };
   /** This week's km: planned, done, left, last week's, and each session's share. */
   week: {
     volume: WeekVolume;
@@ -192,6 +203,13 @@ export async function refresh(
     : {};
   const activities = withAllDayWalking(sessions, dailyDistance);
 
+  // How hard key sessions felt (your ratings), and strength sessions ticked off.
+  const feelings = await loadFeelings(db, addDays(fetchFrom, -7), today);
+  const strengthDays = (await loadExtras(db, addDays(thisMonday, -7), today))
+    .filter((x) => x.kind === 'strength')
+    .map((x) => x.date);
+  const strengthTotal = (await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM extras WHERE kind = 'strength'"))?.n ?? 0;
+
   const doneOn = (d: DateKey) => {
     const g = goals.get(d)?.goal;
     return !!g && progressOf(g, activitiesOn(d, activities), settings).done;
@@ -222,6 +240,7 @@ export async function refresh(
       startKm: startKm(),
       prev,
       periodWeek: cycle ? isPeriodWeek(monday, cycle) : null,
+      lastWeekHardest: hardestIn(feelings, addDays(monday, -7)),
     });
     return { ...v, v: PLAN_VERSION, ...(provisional ? { provisional: true } : {}) };
   };
@@ -358,6 +377,7 @@ export async function refresh(
           daily = generateKeySession({
             date,
             kind: key.kind,
+            feelings,
             settings,
             activities,
             history,
@@ -405,7 +425,7 @@ export async function refresh(
         }
       } else {
         daily = key
-          ? generateKeySession({ date, kind: key.kind, settings, activities, history, readiness, targetKm: 5 })
+          ? generateKeySession({ date, kind: key.kind, settings, activities, history, readiness, targetKm: 5, feelings })
           : generateGoal({ date, settings, activities, history, statuses, readiness, kind });
       }
       await insertGoal(db, daily);
@@ -440,7 +460,7 @@ export async function refresh(
   );
 
   // Game: XP and level, this month's challenge, achievements (unlocks are stored).
-  const xp = totalXp(history, streak.statuses, settings.restDaysPerWeek);
+  const xp = totalXp(history, streak.statuses, settings.restDaysPerWeek) + STRENGTH_XP * strengthTotal;
   const lvl = levelFor(xp);
   const month = monthOf(today);
   const kmThisMonth = monthKm(activities, month, settings.rideFactor);
@@ -489,6 +509,9 @@ export async function refresh(
     },
     todayBoss: !!goals.get(today)?.meta?.boss,
     todayRecovery: !!goals.get(today)?.meta?.recovery,
+    feelings: Object.fromEntries([...feelings].filter(([d]) => d >= addDays(thisMonday, -7))),
+    toRate: sessionToRate([plan, await loadWeekPlan(db, addDays(thisMonday, -7))], today, doneOn, feelings),
+    strength: { thisWeek: strengthDaysIn(strengthDays, thisMonday), today: strengthDays.includes(today) },
     plan,
     nextPlan,
     week: (() => {
@@ -539,6 +562,7 @@ export async function refresh(
           generateKeySession({
             date: x.day,
             kind: x.kind,
+            feelings,
             settings,
             activities,
             history,

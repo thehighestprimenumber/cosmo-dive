@@ -76,6 +76,9 @@ export type ChatContextInput = {
   streak: { current: number; longest: number; freezes: number; restLeftThisWeek: number };
   settings: Settings;
   nextPeriodStart?: DateKey | null;
+  /** Your 1–10 ratings of key sessions, by day. */
+  feelings?: Record<DateKey, number>;
+  strengthThisWeek?: number;
 };
 
 const weekView = (p: WeekPlan, today: DateKey, share: boolean) => {
@@ -135,11 +138,13 @@ export function buildChatContext(i: ChatContextInput) {
             result: d?.goal ? formatValue(d.goal, d.value) : null,
             status: d?.status ?? 'none',
             readiness: d?.meta?.readiness ?? null,
+            felt: i.feelings?.[date] ?? null,
           };
         }),
     },
     nextWeek: i.nextPlan ? weekView(i.nextPlan, today, share) : null,
     recentWeeksKm: i.recentWeeksKm,
+    strengthSessionsThisWeek: i.strengthThisWeek ?? 0,
     streak: i.streak,
     restDaysPerWeek: settings.restDaysPerWeek,
     aimKmPerDay: settings.dailyTargetKm,

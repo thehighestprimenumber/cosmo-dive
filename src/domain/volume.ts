@@ -1,4 +1,5 @@
 import { addDays, daysBetween, mondayOf, toDateKey } from './dates';
+import { HARD_RPE } from './effort';
 import { walkEquivalentMeters } from './progress';
 import type { Activity, DateKey, GoalEvent, Settings } from './types';
 
@@ -97,9 +98,11 @@ export type VolumeInput = {
   prev?: { volume: WeekVolume; actualKm: number } | null;
   /** true/false from your cycle; null when there's no cycle data (→ every 4th week). */
   periodWeek: boolean | null;
+  /** The hardest key session last week, as you rated it (1–10). */
+  lastWeekHardest?: number | null;
 };
 
-export function planVolume({ monday, settings, startKm, prev, periodWeek }: VolumeInput): WeekVolume {
+export function planVolume({ monday, settings, startKm, prev, periodWeek, lastWeekHardest }: VolumeInput): WeekVolume {
   const notes: string[] = [];
   const destination = destinationKm(settings, startKm);
   const ev = settings.event && settings.event.date >= monday ? settings.event : null;
@@ -131,6 +134,8 @@ export function planVolume({ monday, settings, startKm, prev, periodWeek }: Volu
       notes.push(`Last week you did ${round1(prev.actualKm)} of ${round1(prev.volume.km)} km: easing off 10%.`);
     } else if (prev && !prevWasEasy && done < KEEP_GROWING) {
       notes.push(`Last week you did ${round1(prev.actualKm)} of ${round1(prev.volume.km)} km: holding steady.`);
+    } else if (lastWeekHardest != null && lastWeekHardest >= HARD_RPE) {
+      notes.push(`A key walk last week felt ${lastWeekHardest}/10: holding steady before the next step.`);
     } else {
       let rate = MAX_GROWTH;
       if (ev && eventMonday) {

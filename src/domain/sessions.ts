@@ -1,3 +1,4 @@
+import { HARD_RPE } from './effort';
 import { walkingPace } from './aim';
 import { addDays, toDateKey } from './dates';
 import { formatKm, formatPace } from './format';
@@ -14,6 +15,8 @@ const MIN_M = 1000;
 const MAX_M = 42_000;
 
 export type KeySessionInput = {
+  /** How hard past key sessions felt (1–10), by day. */
+  feelings?: Map<DateKey, number>;
   date: DateKey;
   kind: SessionKind;
   settings: Settings;
@@ -59,6 +62,9 @@ export function generateKeySession(input: KeySessionInput): DailyGoal {
     if (light) {
       pace = last?.meta?.pace ?? usual * BRISK_PACE_START;
       notes.push('Light week: same pace as last time, no push.');
+    } else if (last?.meta?.pace && last.done && (input.feelings?.get(last.date) ?? 0) >= HARD_RPE) {
+      pace = last.meta.pace;
+      notes.push(`Same pace as last time: it felt ${input.feelings!.get(last.date)}/10.`);
     } else if (last?.meta?.pace) {
       pace = last.done ? last.meta.pace * BRISK_PACE_STEP : last.meta.pace;
       notes.push(last.done ? '2% faster: you did your last brisk walk.' : 'Same pace as last time until you make it.');

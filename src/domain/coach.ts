@@ -69,6 +69,8 @@ export type ReviewDay = {
   /** How rested you were when the goal was made (from sleep and resting heart rate). */
   readiness: GoalMeta['readiness'] | null;
   boss: boolean;
+  /** How hard it felt, 1–10, if you rated it. */
+  felt: number | null;
 };
 
 export type ReviewInput = {
@@ -114,6 +116,7 @@ export function buildReviewInput(input: {
   streak: { current: number; longest: number; freezes: number };
   settings: Settings;
   nextPeriodStart?: DateKey | null;
+  feelings?: Record<DateKey, number>;
 }): ReviewInput {
   const { today, plan, nextPlan, settings } = input;
   const v = nextPlan.volume!;
@@ -133,6 +136,7 @@ export function buildReviewInput(input: {
         keySession: s?.kind ?? null,
         readiness: d?.meta?.readiness ?? null,
         boss: !!d?.meta?.boss,
+        felt: input.feelings?.[date] ?? null,
       };
     });
   const ev = settings.event;
