@@ -2,6 +2,17 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: work shifts from the phone's calendar
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Source | The calendars you pick in Settings → Work shifts (read-only; write permission blocked in `app.json`) | expo-calendar. `src/services/calendar.ts` |
+| Work day | 6+ hours of events that day in those calendars (an overnight shift counts its hours on each day), or an all-day event | `busyDaysFrom` in `src/domain/shifts.ts` |
+| Key sessions | New plans avoid work days. Sessions already planned on a day that becomes a work day move to a free non-work day of the same week: 2+ days from the other sessions if possible, else the nearest. Sessions you moved yourself (or the coach did, with your OK) are pinned and stay. No better day: it stays | `planWeek`, `avoidBusyDays` |
+| Regular goals | 30% lighter on a work day; the rest of the week rebalances | `WORK_DAY` in `sync.ts` |
+| Week tab | 💼 next to work days; "Moved from Sat (work day)" | |
+| Coach | Sees upcoming work days (chat, check-in, Sunday review) | |
+
 ## 2026-11-22: how it felt (1–10) and strength & mobility
 
 | Topic | Decision | Why / how to change |

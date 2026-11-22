@@ -11,6 +11,7 @@ import { formatTime, nudgeTime } from '../../domain/habits';
 import { useApp } from '../../state/AppState';
 import type { Settings } from '../../domain/types';
 import { deleteApiKey, getApiKey, setApiKey } from '../../services/coach';
+import { hasCalendarAccess, listCalendars, requestCalendarAccess } from '../../services/calendar';
 import { Button, Card, Field, Label, RestPerWeekPicker, styles } from '../../ui/components';
 
 export default function SettingsScreen() {
@@ -138,6 +139,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
           <Button title="Save" onPress={save} />
         </Card>
 
+        <WorkShifts settings={settings} />
+
         <CoachSettings settings={settings} />
 
         <Card>
@@ -256,6 +259,62 @@ function CoachSettings({ settings }: { settings: Settings }) {
       <Text style={styles.hint}>
         Off: the coach only sees “light week”. On: it also sees that it’s for your period and when the next one is due.
       </Text>
+    </Card>
+  );
+}
+
+/** Work shifts from the phone's calendar: key sessions avoid work days. */
+function WorkShifts({ settings }: { settings: Settings }) {
+  const { updateSettings, refresh } = useApp();
+  const [calendars, setCalendars] = useState<{ id: string; title: string }[] | null>(null);
+  const [access, setAccess] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const ok = await hasCalendarAccess();
+      const list = ok ? await listCalendars().catch(() => []) : null;
+      if (!live) return;
+      setAccess(ok);
+      setCalendars(list);
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const allow = async () => {
+    const ok = await requestCalendarAccess();
+    setAccess(ok);
+    if (ok) setCalendars(await listCalendars().catch(() => []));
+  };
+
+  const toggle = async (id: string, on: boolean) => {
+    const ids = on ? [...settings.workCalendars, id] : settings.workCalendars.filter((x) => x !== id);
+    await updateSettings({ workCalendars: ids });
+    await refresh({ regenerateToday: true });
+  };
+
+  return (
+    <Card>
+      <Label>💼 Work shifts</Label>
+      <Text style={[styles.muted, { marginBottom: 8 }]}>
+        Pick the calendars with your shifts. A day with 6+ hours of events in them (or an all-day event) is a work
+        day: key sessions move to a free day, and a regular goal on a work day is 30% lighter. Sessions you move
+        yourself stay put. The calendar is only read, on this phone.
+      </Text>
+      {access === false && <Button title="Read my calendar" variant="secondary" onPress={allow} />}
+      {access &&
+        (calendars?.length ? (
+          calendars.map((c) => (
+            <View key={c.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+              <Text style={[styles.body, { flex: 1 }]}>{c.title}</Text>
+              <Switch value={settings.workCalendars.includes(c.id)} onValueChange={(v) => void toggle(c.id, v)} />
+            </View>
+          ))
+        ) : (
+          <Text style={styles.hint}>No calendars found on this phone.</Text>
+        ))}
     </Card>
   );
 }

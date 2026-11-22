@@ -123,6 +123,7 @@ export async function runWeeklyReview(
     settings,
     nextPeriodStart: snap.cycle?.next?.start ?? null,
     feelings: snap.feelings,
+    busyDays: snap.busyDays,
   });
   let record: CoachRecord;
   try {

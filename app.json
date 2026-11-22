@@ -27,7 +27,10 @@
         "android.permission.health.READ_ELEVATION_GAINED"
       ],
       "predictiveBackGestureEnabled": false,
-      "versionCode": 1
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.WRITE_CALENDAR"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -66,7 +69,8 @@
         }
       ],
       "expo-secure-store",
-      "./plugins/withAbiSplits"
+      "./plugins/withAbiSplits",
+      "expo-calendar"
     ]
   }
 }

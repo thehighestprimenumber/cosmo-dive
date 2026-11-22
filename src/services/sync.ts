@@ -28,9 +28,12 @@ import {
   planWeek,
   sessionOn,
   type KeySession,
+  avoidBusyDays,
   type SessionKind,
+  type ShiftMove,
   type WeekPlan,
 } from '../domain/plan';
+import type { WorkCalendar } from './calendar';
 import { hardestIn, sessionToRate } from '../domain/effort';
 import { STRENGTH_XP, strengthDaysIn } from '../domain/strength';
 import { planVolume, rebalancedDayKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
@@ -61,6 +64,8 @@ import type { ActivitySource } from '../sources/ActivitySource';
 const RECHECK_DAYS = 35;
 /** Never back-fill more than this many days of goals after a long break. */
 const BACKFILL_MAX_DAYS = 90;
+/** A regular goal on a work day is 70% of the day's share. */
+const WORK_DAY = 0.7;
 
 export type DayView = {
   date: DateKey;
@@ -86,6 +91,10 @@ export type Snapshot = {
   feelings: Record<DateKey, number>;
   /** A key session done today or yesterday, waiting for "how did it feel?". */
   toRate: { date: DateKey; kind: SessionKind } | null;
+  /** Work days from your calendar, this week and next. */
+  busyDays: DateKey[];
+  /** Key sessions this sync moved off a work day. */
+  shiftMoves: ShiftMove[];
   /** Strength & mobility sessions ticked off this week, and whether today. */
   strength: { thisWeek: DateKey[]; today: boolean };
   /** This week's km: planned, done, left, last week's, and each session's share. */
@@ -159,7 +168,14 @@ export async function refresh(
   db: SQLiteDatabase,
   source: ActivitySource,
   settings: Settings,
-  opts: { now?: Date; fullRebuild?: boolean; regenerateToday?: boolean; todayKind?: RegularKind } = {},
+  opts: {
+    now?: Date;
+    fullRebuild?: boolean;
+    regenerateToday?: boolean;
+    todayKind?: RegularKind;
+    /** Work days from your calendar (optional). */
+    calendar?: WorkCalendar | null;
+  } = {},
 ): Promise<Snapshot> {
   const today = toDateKey(opts.now ?? new Date());
   const start = settings.startDate;
@@ -208,6 +224,10 @@ export async function refresh(
   const strengthDays = (await loadExtras(db, addDays(thisMonday, -7), today))
     .filter((x) => x.kind === 'strength')
     .map((x) => x.date);
+  // Work days from your calendar, this week and next.
+  const busy = opts.calendar
+    ? await opts.calendar.busyDays(thisMonday, addDays(thisMonday, 13)).catch(() => [] as DateKey[])
+    : [];
   const strengthTotal = (await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM extras WHERE kind = 'strength'"))?.n ?? 0;
 
   const doneOn = (d: DateKey) => {
@@ -257,6 +277,7 @@ export async function refresh(
   const makePlan = async (monday: DateKey, firstDay: DateKey, provisional: boolean): Promise<WeekPlan> => {
     const volume = await volumeFor(monday, provisional);
     const p = planWeek(monday, firstDay, activities, settings, {
+      busy,
       backToBack: volume.backToBack,
       trekDays: trekDaysIn(monday).filter((d) => d >= firstDay),
     });
@@ -279,6 +300,16 @@ export async function refresh(
     plan = forwarded.plan;
     await saveWeekPlan(db, plan);
   }
+  // Key sessions that landed on a work day move to a free day (unless you placed them).
+  const shiftMoves: ShiftMove[] = [];
+  if (busy.length) {
+    const r = avoidBusyDays(plan, busy, today, doneOn(today));
+    if (r.moved.length) {
+      plan = r.plan;
+      shiftMoves.push(...r.moved);
+      await saveWeekPlan(db, plan);
+    }
+  }
   // You picked another goal type for today: today's key session moves on.
   const todaysSession = sessionOn(plan, today);
   if (opts.todayKind && todaysSession && isMovable(todaysSession)) {
@@ -293,6 +324,15 @@ export async function refresh(
   if (!nextPlan && nextWeekVisible(now)) {
     nextPlan = await makePlan(nextMonday, nextMonday, true);
     await saveWeekPlan(db, nextPlan);
+  }
+
+  if (nextPlan && busy.length) {
+    const r = avoidBusyDays(nextPlan, busy, today, doneOn(today));
+    if (r.moved.length) {
+      nextPlan = r.plan;
+      shiftMoves.push(...r.moved);
+      await saveWeekPlan(db, nextPlan);
+    }
   }
 
   // Each session's km for a plan's week.
@@ -400,8 +440,11 @@ export async function refresh(
             keyDaysLeft: keyAhead.length,
             restLeft: streakSoFar.restLeftThisWeek,
           });
+          const workDay = busy.includes(date);
+          const shareKm = workDay ? Math.round(dayKm * WORK_DAY * 10) / 10 : dayKm;
           const planNotes = [
-            `This week: ${volume.km} km (${Math.round(doneKm * 10) / 10} done so far). Today’s share: ${dayKm} km.`,
+            `This week: ${volume.km} km (${Math.round(doneKm * 10) / 10} done so far). Today’s share: ${shareKm} km.`,
+            ...(workDay ? ['Work day (from your calendar): a lighter goal; the other days make up for it.'] : []),
             ...volume.notes,
           ];
           const yesterday = addDays(date, -1);
@@ -413,7 +456,7 @@ export async function refresh(
             statuses,
             readiness,
             kind,
-            dayKm,
+            dayKm: shareKm,
             planNotes,
             recoveryNotes:
               date === today && coachRest
@@ -511,6 +554,8 @@ export async function refresh(
     todayRecovery: !!goals.get(today)?.meta?.recovery,
     feelings: Object.fromEntries([...feelings].filter(([d]) => d >= addDays(thisMonday, -7))),
     toRate: sessionToRate([plan, await loadWeekPlan(db, addDays(thisMonday, -7))], today, doneOn, feelings),
+    busyDays: busy,
+    shiftMoves,
     strength: { thisWeek: strengthDaysIn(strengthDays, thisMonday), today: strengthDays.includes(today) },
     plan,
     nextPlan,

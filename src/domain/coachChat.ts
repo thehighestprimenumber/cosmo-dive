@@ -79,6 +79,8 @@ export type ChatContextInput = {
   /** Your 1–10 ratings of key sessions, by day. */
   feelings?: Record<DateKey, number>;
   strengthThisWeek?: number;
+  /** Work days from your calendar (this week and next). */
+  busyDays?: DateKey[];
 };
 
 const weekView = (p: WeekPlan, today: DateKey, share: boolean) => {
@@ -145,6 +147,7 @@ export function buildChatContext(i: ChatContextInput) {
     nextWeek: i.nextPlan ? weekView(i.nextPlan, today, share) : null,
     recentWeeksKm: i.recentWeeksKm,
     strengthSessionsThisWeek: i.strengthThisWeek ?? 0,
+    workDays: (i.busyDays ?? []).filter((d) => d >= today),
     streak: i.streak,
     restDaysPerWeek: settings.restDaysPerWeek,
     aimKmPerDay: settings.dailyTargetKm,

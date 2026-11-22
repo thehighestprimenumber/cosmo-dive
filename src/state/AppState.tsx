@@ -9,6 +9,7 @@ import { scheduleMorning, setupNotifications } from '../services/notifications';
 import { refresh as runRefresh, type Snapshot } from '../services/sync';
 import { afterSync } from '../services/afterSync';
 import { registerBackgroundSync } from '../services/backgroundSync';
+import { workCalendarFor } from '../services/calendar';
 import type { SourceStatus } from '../sources/ActivitySource';
 import { sourceFor } from '../sources';
 
@@ -56,7 +57,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           const status = await source.status();
           setSourceStatus(status);
           if (status.state !== 'ready') return;
-          const snap = await runRefresh(db, source, s, opts);
+          const snap = await runRefresh(db, source, s, { ...opts, calendar: workCalendarFor(s) });
           setSnapshot(snap);
           snapshotRef.current = snap;
           await afterSync(db, s, snap, { inBackground: false }).catch(() => {});
@@ -117,7 +118,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const plan = normalizePlan(saved);
       const today = toDateKey(new Date());
       const todayDone = !!snapshotRef.current?.todayProgress?.done;
-      const next = moveSession(plan, id, to, today, todayDone);
+      const next = moveSession(plan, id, to, today, todayDone, true);
       if (next === plan) return;
       await saveWeekPlan(db, next);
       // If today's goal no longer matches the plan, sync replaces it (unless already done).

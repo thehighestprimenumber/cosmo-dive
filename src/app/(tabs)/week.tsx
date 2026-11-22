@@ -146,6 +146,7 @@ function WeekList({ plan }: { plan: WeekPlan }) {
               <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: STATUS_COLOR[status] }} />
               <Text style={[styles.body, { width: 92, fontWeight: d === today ? '800' : '400' }]}>
                 {d === today ? 'Today' : dayName(d)}
+                {snapshot.busyDays.includes(d) ? ' 💼' : ''}
               </Text>
               <View style={{ flex: 1 }}>
                 {session ? (
@@ -163,7 +164,10 @@ function WeekList({ plan }: { plan: WeekPlan }) {
                   <Text style={styles.muted}>{isFuture ? 'Daily goal, set on the day' : '—'}</Text>
                 )}
                 {session && session.day !== session.plannedDay && (
-                  <Text style={styles.hint}>Moved from {dayName(session.plannedDay)}</Text>
+                  <Text style={styles.hint}>
+                    Moved from {dayName(session.plannedDay)}
+                    {snapshot.busyDays.includes(session.plannedDay) && !session.pinned ? ' (work day)' : ''}
+                  </Text>
                 )}
               </View>
               {canMove && (

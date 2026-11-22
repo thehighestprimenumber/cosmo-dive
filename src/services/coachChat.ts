@@ -69,6 +69,7 @@ function contextFor(snap: Snapshot, settings: Settings, now: Date) {
     nextPeriodStart: snap.cycle?.next?.start ?? null,
     feelings: snap.feelings,
     strengthThisWeek: snap.strength.thisWeek.length,
+    busyDays: snap.busyDays,
   });
 }
 

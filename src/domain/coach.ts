@@ -99,6 +99,8 @@ export type ReviewInput = {
   event: (Omit<GoalEvent, 'name'> & { name: string; weeksAway: number }) | null;
   /** Only with "share my cycle with the coach" on. */
   nextPeriodStart?: DateKey | null;
+  /** Next week's work days, from your calendar. */
+  nextWeekWorkDays?: DateKey[];
 };
 
 const weekdayOf = (d: DateKey) =>
@@ -117,6 +119,7 @@ export function buildReviewInput(input: {
   settings: Settings;
   nextPeriodStart?: DateKey | null;
   feelings?: Record<DateKey, number>;
+  busyDays?: DateKey[];
 }): ReviewInput {
   const { today, plan, nextPlan, settings } = input;
   const v = nextPlan.volume!;
@@ -177,6 +180,7 @@ export function buildReviewInput(input: {
     aimKmPerDay: settings.dailyTargetKm,
     event: ev ? { ...ev, weeksAway: Math.max(0, Math.floor(daysBetween(today, ev.date) / 7)) } : null,
     ...(share ? { nextPeriodStart: input.nextPeriodStart ?? null } : {}),
+    ...(input.busyDays?.length ? { nextWeekWorkDays: input.busyDays.filter((d) => d >= nextPlan.week) } : {}),
   };
 }
 
@@ -261,7 +265,7 @@ export function applyProposal(
     const firstDay = today > plan.week ? today : plan.week;
     if (!freeDays(plan, firstDay, firstDay === today && todayDone, s.id).includes(a.to)) return null;
     return {
-      plan: { ...plan, sessions: plan.sessions.map((x) => (x.id === s.id ? { ...x, day: a.to, dropped: false } : x)) },
+      plan: { ...plan, sessions: plan.sessions.map((x) => (x.id === s.id ? { ...x, day: a.to, dropped: false, pinned: true } : x)) },
       from: s.day,
     };
   }

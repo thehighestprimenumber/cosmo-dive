@@ -20,6 +20,8 @@ export type KeySession = {
   plannedDay: DateKey;
   /** The week ran out of free days before you could do it. */
   dropped?: boolean;
+  /** You (or the coach, with your OK) put it on this day: work days don't move it. */
+  pinned?: boolean;
 };
 
 export type WeekPlan = {
@@ -46,6 +48,8 @@ export type PlanOptions = {
   backToBack?: boolean;
   /** Days of the trek that fall in this week. */
   trekDays?: DateKey[];
+  /** Work days (from your calendar): key sessions go elsewhere when possible. */
+  busy?: DateKey[];
 };
 
 /**
@@ -78,7 +82,7 @@ export function planWeek(
   const preference = [5, 6, 2, 3, 4, 1, 0];
   const rank = (d: DateKey) => {
     const i = daysBetween(monday, d);
-    return score[i] * 10 - preference.indexOf(i) * 0.001;
+    return score[i] * 10 - preference.indexOf(i) * 0.001 - (opts.busy?.includes(d) ? 1e6 : 0);
   };
   const byRank = [...days].sort((a, b) => rank(b) - rank(a));
 
@@ -141,10 +145,18 @@ export function freeDays(plan: WeekPlan, today: DateKey, todayDone: boolean, id:
 }
 
 /** Move a key session to another free day this week. Returns the plan unchanged if that isn't allowed. */
-export function moveSession(plan: WeekPlan, id: string, to: DateKey, today: DateKey, todayDone: boolean): WeekPlan {
+export function moveSession(
+  plan: WeekPlan,
+  id: string,
+  to: DateKey,
+  today: DateKey,
+  todayDone: boolean,
+  /** You chose the day: work days won't move it again. */
+  pin = false,
+): WeekPlan {
   const s = sessionById(plan, id);
   if (!s || !isMovable(s) || !freeDays(plan, today, todayDone, id).includes(to)) return plan;
-  return { ...plan, sessions: plan.sessions.map((x) => (x.id === id ? { ...x, day: to, dropped: false } : x)) };
+  return { ...plan, sessions: plan.sessions.map((x) => (x.id === id ? { ...x, day: to, dropped: false, ...(pin ? { pinned: true } : {}) } : x)) };
 }
 
 /** Drop a session for this week (no free day left). */
@@ -177,4 +189,36 @@ export function forwardMissed(
 /** Whether next week's plan should already exist (Sunday evening onward). */
 export function nextWeekVisible(now: Date): boolean {
   return now.getDay() === 0 && now.getHours() >= NEXT_WEEK_FROM_HOUR;
+}
+
+export type ShiftMove = { id: string; kind: SessionKind; from: DateKey; to: DateKey };
+
+/**
+ * Key sessions that landed on a work day (from your calendar) move to a free
+ * day of the same week that isn't one: 2+ days from the other sessions if
+ * possible, else the nearest. Sessions you placed yourself stay put, and a
+ * session with nowhere better to go stays where it is.
+ */
+export function avoidBusyDays(
+  plan: WeekPlan,
+  busy: DateKey[],
+  today: DateKey,
+  todayDone: boolean,
+): { plan: WeekPlan; moved: ShiftMove[] } {
+  const moved: ShiftMove[] = [];
+  let p = plan;
+  for (const s of plan.sessions) {
+    if (s.dropped || s.pinned || !isMovable(s) || !busy.includes(s.day)) continue;
+    if (s.day < today || (s.day === today && todayDone)) continue;
+    const current = sessionById(p, s.id)!;
+    const options = freeDays(p, today, todayDone, s.id).filter((d) => !busy.includes(d));
+    if (!options.length) continue;
+    const others = p.sessions.filter((x) => x.id !== s.id && !x.dropped).map((x) => x.day);
+    const gapOk = (d: DateKey) => others.every((o) => Math.abs(daysBetween(o, d)) >= MIN_GAP);
+    const near = (d: DateKey) => Math.abs(daysBetween(current.day, d));
+    const to = [...options].sort((a, b) => Number(gapOk(b)) - Number(gapOk(a)) || near(a) - near(b) || (a < b ? -1 : 1))[0];
+    p = { ...p, sessions: p.sessions.map((x) => (x.id === s.id ? { ...x, day: to } : x)) };
+    moved.push({ id: s.id, kind: s.kind, from: current.day, to });
+  }
+  return { plan: p, moved };
 }

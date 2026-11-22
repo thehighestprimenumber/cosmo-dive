@@ -5,6 +5,7 @@ import { DB_NAME, loadSettings, migrate, saveSettings } from '../data/db';
 import { toDateKey } from '../domain/dates';
 import { sourceFor } from '../sources';
 import { afterSync } from './afterSync';
+import { workCalendarFor } from './calendar';
 import { refresh } from './sync';
 
 export const SYNC_TASK = 'daily-spark-sync';
@@ -28,7 +29,7 @@ TaskManager.defineTask(SYNC_TASK, async () => {
     const source = sourceFor(settings);
     if ((await source.status()).state !== 'ready') return BackgroundTask.BackgroundTaskResult.Failed;
 
-    const snap = await refresh(db, source, settings);
+    const snap = await refresh(db, source, settings, { calendar: workCalendarFor(settings) });
     await afterSync(db, settings, snap, { inBackground: true });
     await saveSettings(db, { lastBackgroundSync: Date.now() });
     return BackgroundTask.BackgroundTaskResult.Success;

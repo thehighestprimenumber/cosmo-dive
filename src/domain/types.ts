@@ -160,6 +160,8 @@ export type Settings = {
   dailyCheckin: boolean;
   /** Last day the morning check-in was considered (so it runs once a day). */
   lastCheckin: DateKey | null;
+  /** Calendars whose events are work shifts (ids on this phone). Empty: not used. */
+  workCalendars: string[];
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -186,6 +188,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   coachRestDay: null,
   dailyCheckin: true,
   lastCheckin: null,
+  workCalendars: [],
 };
 
 export type Progress = {

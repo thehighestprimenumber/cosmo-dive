@@ -20,6 +20,9 @@ function walk(date: string, minutes: number): Activity {
   };
 }
 
+const sessionOnDay = (snap: { plan: { sessions: { day: string; dropped?: boolean }[] } }, d: string) =>
+  snap.plan.sessions.some((x) => x.day === d && !x.dropped);
+
 function sourceOf(acts: Activity[]): ActivitySource {
   return {
     name: 'test',
@@ -348,6 +351,23 @@ describe('refresh', () => {
       await migrate(db2);
       const chosen = await refresh(db2, sourceOf(big), s, { now: at(addDays(MON, 1), 9), todayKind: 'distance' });
       expect(chosen.todayRecovery).toBe(false);
+    });
+
+    it('work days from the calendar: the long walk moves off them, a regular goal is lighter', async () => {
+      const db = fakeDb();
+      await migrate(db);
+      const plain = await refresh(db, sourceOf(history), s, { now: at(MON, 9) });
+      const long = plain.plan.sessions.find((x) => x.kind === 'long_walk')!;
+      const db2 = fakeDb();
+      await migrate(db2);
+      const calendar = { busyDays: async () => [MON, long.day] };
+      const snap = await refresh(db2, sourceOf(history), s, { now: at(MON, 9), calendar });
+      expect(snap.busyDays).toEqual([MON, long.day]);
+      const moved = snap.plan.sessions.find((x) => x.kind === 'long_walk')!;
+      expect(moved.day).not.toBe(long.day);
+      expect(snap.todayNotes.join(' ')).toContain('Work day');
+      const goalKm = (g: typeof snap.todayGoal) => (g && 'meters' in g ? g.meters : g && 'seconds' in g ? g.seconds : 0);
+      if (!sessionOnDay(plain, MON)) expect(goalKm(snap.todayGoal)).toBeLessThan(goalKm(plain.todayGoal));
     });
 
     it('a normal day is not a recovery day', async () => {
