@@ -16,6 +16,10 @@ Daily Spark reads the walks and rides your Galaxy Watch records (Samsung Health 
 - **Home-screen widget**: today's goal, progress, streak and your week at a glance. To add it: long-press the home screen → Widgets → Daily Spark. It updates after every sync. Diagnostics shows a preview.
 - **Watch Tile (Galaxy Watch / Wear OS)**: the same content on your watch, as a Tile with a progress ring. It needs the watch APK from the same release, sideloaded onto the watch (see below).
 - **🧠 AI coach (optional)**: on Sunday evening, Claude reviews your week and suggests up to two changes to next week (move a key session, or fewer or a few more km). The plan's safety rules check each suggestion, and nothing changes until you tap **Apply** (you can undo it). It needs your own Claude API key (Settings → AI coach, stored encrypted on the phone) and sees only a summary of your weeks; sharing your cycle with it is off by default. **💬 Chat with the coach** any day: tell it what your watch can't know (a long shift, something sore, little time). It answers with advice and, when it helps, a change you can apply: rest today (without using a rest day), switch today's goal type, move a key session, or lighten the week. **☀️ Morning check-in**: on mornings when something stands out (after a very big day, a short night, two days without the goal, falling behind, no rest days left, or something you told the coach), it writes first, with a notification. Ordinary days: nothing. Details: [`docs/decisions.md`](docs/decisions.md).
+- **How did it feel? (1–10)**: after a long or brisk walk, one tap on Today. At 9–10, next week holds instead of growing and the brisk pace waits.
+- **💼 Work shifts**: pick the calendars with your shifts (Settings). Days with 6+ hours of events are work days: key sessions move to a free day and regular goals are 30% lighter. Sessions you move yourself stay put.
+- **🌦️ Weather**: set your town (Settings; Open-Meteo, no account). The Week tab shows the forecast and suggests moving a long or brisk walk away from heavy rain, 33 °C+ or strong wind.
+- **🦵 Strength & mobility**: 10 minutes for trail legs, any 2 days a week, ticked off on Today (+5 XP).
 - **Every sport counts**: any exercise your watch records (kayak, swimming, gym…) counts for time and heart rate goals. Walks, hikes and runs count for distance 1:1, rides at 1/3. Doing something different today? Switch today's goal to **Distance**, **Time** or **Heart rate** on the Today screen (until you've completed it).
 - **Flexible rest days**: no fixed days. Every day has a goal, and you choose how many rest days you get per week (2 by default). Any day you don't hit the goal uses one of them, without breaking your streak. Train on a day you meant to rest and the rest day stays available for later that week. Only days beyond your rest days break the streak.
 - **Streak freezes**: you earn one 🧊 for every 7 days completed, up to 2. A missed day uses a freeze instead of resetting your streak.
@@ -36,7 +40,7 @@ Daily Spark reads the walks and rides your Galaxy Watch records (Samsung Health 
   - 🏆 **Achievements** (streaks, bosses, perfect week, all-rounder, comeback, monthly champion, 100 km month, level 5). Once unlocked, they stay unlocked.
 - **Reminders**: a morning reminder, an evening "save your streak" reminder, and (optional) a nudge 30 minutes before the time you usually start moving, learned from the last 4 weeks. The last two only fire while today's goal isn't done.
 - **Background sync**: about every 30 minutes (Android decides exactly when), the app reads Health Connect, notifies you once when today's goal is done, and keeps the evening reminder up to date.
-- **Backup**: **Settings → Export history** saves your goal history to a JSON file (e.g. to Google Drive). **Import history** merges it on a new phone and recalculates your streak.
+- **Backup**: **Settings → Export history** saves your goal history to a JSON file (e.g. to Google Drive). **Import history** merges it on a new phone and recalculates your streak. **Automatic weekly backup** saves it to a folder you pick and keeps the last 8.
 - **History**: each day's goal is saved once, in SQLite, and never changed. The one exception is today's goal: it's recalculated when you change settings or the rules change in an update, unless you've already completed it. Completion, streaks and the calendar are always *recalculated* from those goals plus Health Connect. If you edit or delete a workout, use **Settings → Rebuild history**.
 
 ## Install on your phone
@@ -87,4 +91,3 @@ npx expo start       # needs a development build, not Expo Go (Health Connect is
 ## Not in the MVP yet
 - Watch complication
 - More sports, more goal types, Strava as a second data source
-- Automatic backups (export is manual for now)
