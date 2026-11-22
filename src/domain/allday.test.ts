@@ -53,4 +53,9 @@ describe('all-day walking (Samsung "distance while active")', () => {
     const kayak: Activity = { ...part('k', 10, 0, 60, 0), sport: 'other' };
     expect(withAllDayWalking([merged, kayak], {}).map((a) => a.id)).toEqual(['m', 'k']);
   });
+
+  it('a glitchy pace (e.g. 4 min/km for walking) is kept within 9–17 min/km for the estimate', () => {
+    const fast = withAllDayWalking([], { '2026-11-22': 2000 }, 0.25);
+    expect(fast[0].durationS).toBe(1080); // 2 km at 9 min/km
+  });
 });

@@ -21,6 +21,8 @@ export function withAllDayWalking(
   /** Your walking pace (s per m), to turn the extra distance into minutes for time goals. */
   paceSPerM = DEFAULT_PACE_S_PER_M,
 ): Activity[] {
+  // A walking pace outside 9–17 min/km is a measuring glitch: keep the estimate sensible.
+  const pace = Math.min(MAX_PACE_S_PER_M, Math.max(MIN_PACE_S_PER_M, paceSPerM));
   const real = withoutOverlaps(activities.filter((a) => !a.synthetic));
   const sessions = new Map<DateKey, number>();
   for (const a of real) {
@@ -38,7 +40,7 @@ export function withAllDayWalking(
       start: noon,
       end: noon,
       // Time at your walking pace, so an unrecorded stroll counts for time goals too.
-      durationS: Math.round(gap * paceSPerM),
+      durationS: Math.round(gap * pace),
       distanceM: gap,
       hr: [],
       origin: 'all-day',
@@ -51,6 +53,8 @@ export function withAllDayWalking(
 
 /** About 12 min/km, until your own pace is known. */
 export const DEFAULT_PACE_S_PER_M = 0.72;
+const MIN_PACE_S_PER_M = 0.54; // 9 min/km
+const MAX_PACE_S_PER_M = 1.02; // 17 min/km
 
 /**
  * The same outing recorded twice (e.g. Samsung's parts of a walk and the
