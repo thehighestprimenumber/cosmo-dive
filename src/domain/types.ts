@@ -166,6 +166,9 @@ export type Settings = {
   weatherPlace: { name: string; lat: number; lon: number } | null;
   /** Weather suggestions you answered "Not now" to. */
   weatherDismissed: string[];
+  /** Folder for the weekly automatic backup (Android folder address), if chosen. */
+  backupFolder: string | null;
+  lastAutoBackup: { at: number; ok: boolean; error?: string } | null;
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -195,6 +198,8 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   workCalendars: [],
   weatherPlace: null,
   weatherDismissed: [],
+  backupFolder: null,
+  lastAutoBackup: null,
 };
 
 export type Progress = {

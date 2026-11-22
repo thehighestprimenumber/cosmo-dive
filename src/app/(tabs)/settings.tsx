@@ -13,6 +13,7 @@ import type { Settings } from '../../domain/types';
 import { deleteApiKey, getApiKey, setApiKey } from '../../services/coach';
 import { hasCalendarAccess, listCalendars, requestCalendarAccess } from '../../services/calendar';
 import { findPlaces, type Place } from '../../services/weather';
+import { chooseBackupFolder, runAutoBackup } from '../../services/autoBackup';
 import { Button, Card, Field, Label, RestPerWeekPicker, styles } from '../../ui/components';
 
 export default function SettingsScreen() {
@@ -178,6 +179,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
           </Text>
           <Button title="Export history" variant="secondary" onPress={doExport} />
           <Button title="Import history" variant="secondary" onPress={doImport} disabled={syncing} />
+          <AutoBackup settings={settings} />
         </Card>
       </ScrollView>
     </SafeAreaView>
@@ -370,5 +372,71 @@ function WeatherPlace({ settings }: { settings: Settings }) {
         </>
       )}
     </Card>
+  );
+}
+
+/** Weekly automatic backup to a folder you pick once. */
+function AutoBackup({ settings }: { settings: Settings }) {
+  const db = useSQLiteContext();
+  const { updateSettings } = useApp();
+  const [busy, setBusy] = useState(false);
+  const last = settings.lastAutoBackup;
+  const folderName = settings.backupFolder ? decodeURIComponent(settings.backupFolder.split('%3A').pop() ?? '').split('/').pop() : null;
+
+  const choose = async () => {
+    const uri = await chooseBackupFolder();
+    if (!uri) return;
+    setBusy(true);
+    try {
+      const next = await updateSettings({ backupFolder: uri });
+      const r = await runAutoBackup(db, { ...next }, true);
+      await updateSettings({ lastAutoBackup: r });
+      if (r && !r.ok) Alert.alert('Backup', `Couldn’t write there: ${r.error}. Try another folder.`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const now = async () => {
+    setBusy(true);
+    try {
+      const r = await runAutoBackup(db, { ...settings }, true);
+      await updateSettings({ lastAutoBackup: r });
+      Alert.alert('Backup', r?.ok ? 'Saved.' : `Failed: ${r?.error}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={{ marginTop: 12 }}>
+      <Label>Automatic weekly backup</Label>
+      <Text style={styles.muted}>
+        Saves the history once a week to a folder on this phone and keeps the last 8. Android doesn’t let apps pick a
+        Google Drive folder directly, so pick a phone folder (e.g. Documents) and copy or sync it to Drive.
+      </Text>
+      {settings.backupFolder ? (
+        <>
+          <Text style={[styles.body, { marginTop: 6 }]}>📁 {folderName || 'Chosen folder'}</Text>
+          <Text style={styles.hint}>
+            {last
+              ? last.ok
+                ? `Last backup: ${new Date(last.at).toLocaleString()}`
+                : `Last try failed (${new Date(last.at).toLocaleDateString()}): ${last.error}`
+              : 'No backup yet.'}
+          </Text>
+          <Button title={busy ? 'Saving…' : 'Back up now'} variant="secondary" onPress={now} disabled={busy} />
+          <Button title="Change folder" variant="secondary" onPress={choose} disabled={busy} />
+          <Button
+            title="Turn off"
+            variant="secondary"
+            onPress={() => updateSettings({ backupFolder: null, lastAutoBackup: null })}
+            disabled={busy}
+          />
+        </>
+      ) : (
+        <Button title="Choose a folder" variant="secondary" onPress={choose} disabled={busy} />
+      )}
+    </View>
   );
 }

@@ -9,6 +9,7 @@ import { sendStateToWatch } from '../../modules/wear-sync';
 import { shouldAutoReview } from '../domain/coach';
 import { checkinDue } from '../domain/checkin';
 import { runDailyCheckin } from './coachChat';
+import { backupDue, runAutoBackup } from './autoBackup';
 import { getApiKey, runWeeklyReview } from './coach';
 import { notifyAchievements, notifyCheckin, notifyCoachReview, notifyAimReached, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
 import type { Snapshot } from './sync';
@@ -68,6 +69,11 @@ export async function afterSync(
     });
     // In the app, don't hold up the sync spinner while the coach thinks.
     if (inBackground) await checkin;
+  }
+  // Weekly automatic backup, if a folder is chosen (never blocks the app).
+  if (backupDue(settings, Date.now())) {
+    const backup = runAutoBackup(db, settings).catch(() => {});
+    if (inBackground) await backup;
   }
   await updateEvening(settings, snap.today, snap.todayGoal, done, snap.streak.current);
   await updateNudge(settings, snap.today, snap.todayGoal, done, snap.usualTime);

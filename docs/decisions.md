@@ -2,6 +2,15 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: automatic weekly backup
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Where | A folder you pick once with Android's folder picker (Settings → Backup → Automatic weekly backup) | Writing straight to Google Drive would need a Google sign-in and a Google Cloud app; Android's picker doesn't offer Drive folders. A phone folder you copy or sync to Drive is the honest option |
+| When | Once a week, after a sync (background or app); after a failure, tries again the next day. "Back up now" any time | `backupDue` / `runAutoBackup` in `src/services/autoBackup.ts` |
+| What | The same JSON as "Export history" (goals, how it felt, strength sessions, preferences); the newest 8 files are kept | Import works with any of them |
+| Status | Settings shows the folder, the last backup, or the last error | |
+
 ## 2026-11-22: weather
 
 | Topic | Decision | Why / how to change |
