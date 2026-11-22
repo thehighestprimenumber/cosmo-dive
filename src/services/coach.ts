@@ -50,7 +50,16 @@ export async function askClaude(opts: {
   messages: Anthropic.Beta.BetaMessageParam[];
   schema: Record<string, unknown>;
   fetchImpl?: typeof fetch;
+  /** Where to keep the debug log of this request (Coach screen → 🐞). */
+  db?: SQLiteDatabase;
+  purpose?: CoachCall['purpose'];
 }): Promise<{ json: unknown; model: string }> {
+  const started = Date.now();
+  const calls: CoachCall[] = [];
+  const log = async (c: Omit<CoachCall, 'at' | 'purpose' | 'ms'>) => {
+    calls.push({ at: started, purpose: opts.purpose ?? 'chat', ms: Date.now() - started, ...c });
+    if (opts.db) await appendCoachLog(opts.db, calls[calls.length - 1]).catch(() => {});
+  };
   const Sdk = await loadSdk();
   const client = new Sdk({
     apiKey: opts.apiKey,
@@ -58,26 +67,130 @@ export async function askClaude(opts: {
     timeout: 120_000,
     ...(opts.fetchImpl ? { fetch: opts.fetchImpl } : {}),
   });
-  const response = await client.beta.messages.create({
-    model: COACH_MODEL,
-    max_tokens: 16000,
-    // If the model declines, the API retries on a fallback model in the same call.
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    output_config: { effort: 'medium', format: { type: 'json_schema', schema: opts.schema } },
-    system: opts.system,
-    messages: opts.messages,
-  });
-  if (response.stop_reason === 'refusal') throw new Error('The coach couldn’t answer this time.');
-  if (response.stop_reason === 'max_tokens') throw new Error('The coach’s answer was cut off.');
+  const strict = () =>
+    client.beta.messages.create({
+      model: COACH_MODEL,
+      max_tokens: 16000,
+      // If the model declines, the API retries on a fallback model in the same call.
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: opts.schema } },
+      system: opts.system,
+      messages: opts.messages,
+    });
+  // Plan B if the request is rejected (400): no schema enforcement or fallback,
+  // the schema goes in the instructions and the JSON is read leniently.
+  const lenient = () =>
+    client.beta.messages.create({
+      model: COACH_MODEL,
+      max_tokens: 16000,
+      output_config: { effort: 'medium' },
+      system: `${opts.system}\n\nAnswer with only one JSON object (no other text, no code fences) matching this JSON schema:\n${JSON.stringify(opts.schema)}`,
+      messages: opts.messages,
+    });
+  const describe = (e: unknown) => {
+    if (e instanceof Sdk.APIError) {
+      const body = e.error as { error?: { type?: string; message?: string } } | undefined;
+      return {
+        status: e.status ?? null,
+        error: [body?.error?.type, body?.error?.message ?? e.message].filter(Boolean).join(': '),
+        requestId: e.requestID ?? null,
+      };
+    }
+    return { status: null, error: e instanceof Error ? `${e.name}: ${e.message}` : String(e), requestId: null };
+  };
+  let response;
+  try {
+    response = await strict();
+  } catch (e) {
+    await log({ mode: 'strict', ...describe(e) });
+    if (!(e instanceof Sdk.BadRequestError)) throw e;
+    try {
+      response = await lenient();
+    } catch (e2) {
+      await log({ mode: 'lenient', ...describe(e2) });
+      throw e2;
+    }
+  }
+  const mode = calls.length ? 'lenient' : 'strict';
+  const ok = {
+    mode,
+    status: 200,
+    model: response.model,
+    stopReason: response.stop_reason ?? null,
+    tokensIn: response.usage?.input_tokens ?? null,
+    tokensOut: response.usage?.output_tokens ?? null,
+    requestId: (response as unknown as { _request_id?: string | null })._request_id ?? null,
+  } as const;
+  if (response.stop_reason === 'refusal') {
+    await log({ ...ok, error: 'refusal' });
+    throw new Error('The coach couldn’t answer this time.');
+  }
+  if (response.stop_reason === 'max_tokens') {
+    await log({ ...ok, error: 'cut off (max_tokens)' });
+    throw new Error('The coach’s answer was cut off.');
+  }
   const text = response.content.find((b) => b.type === 'text');
-  if (!text || text.type !== 'text') throw new Error('The coach sent an empty answer.');
-  return { json: JSON.parse(text.text), model: response.model };
+  if (!text || text.type !== 'text') {
+    await log({ ...ok, error: 'no text in the answer' });
+    throw new Error('The coach sent an empty answer.');
+  }
+  try {
+    const json = parseJsonLoose(text.text);
+    await log(ok);
+    return { json, model: response.model };
+  } catch (e) {
+    await log({ ...ok, error: `unreadable JSON: ${text.text.slice(0, 200)}` });
+    throw e;
+  }
+}
+
+// ---- debug log (last 30 requests, shown on the Coach screen) ----
+
+export type CoachCall = {
+  at: number;
+  purpose: 'chat' | 'review' | 'checkin';
+  /** strict: JSON schema enforced; lenient: plan B after a 400. */
+  mode: 'strict' | 'lenient';
+  ms: number;
+  status: number | null;
+  model?: string;
+  stopReason?: string | null;
+  tokensIn?: number | null;
+  tokensOut?: number | null;
+  requestId?: string | null;
+  error?: string;
+};
+
+const LOG_KEY = 'coachDebugLog';
+
+export async function loadCoachLog(db: SQLiteDatabase): Promise<CoachCall[]> {
+  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key = ?', LOG_KEY);
+  return row ? (JSON.parse(row.value) as CoachCall[]) : [];
+}
+
+async function appendCoachLog(db: SQLiteDatabase, c: CoachCall): Promise<void> {
+  const all = [...(await loadCoachLog(db)), c].slice(-30);
+  await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', LOG_KEY, JSON.stringify(all));
+}
+
+/** The JSON object in a reply, even with stray text or code fences around it. */
+export function parseJsonLoose(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) return JSON.parse(text.slice(start, end + 1));
+    throw new Error('The coach’s answer wasn’t readable.');
+  }
 }
 
 /** One request to Claude for this week's review. */
-export function requestReview(apiKey: string, input: ReviewInput, fetchImpl?: typeof fetch) {
+export function requestReview(apiKey: string, input: ReviewInput, fetchImpl?: typeof fetch, db?: SQLiteDatabase) {
   return askClaude({
+    db,
+    purpose: 'review',
     apiKey,
     system: SYSTEM,
     schema: REVIEW_SCHEMA as unknown as Record<string, unknown>,
@@ -94,7 +207,11 @@ export async function coachErrorMessage(e: unknown): Promise<string> {
   if (e instanceof Anthropic.PermissionDeniedError) return 'This API key can’t use the model.';
   if (e instanceof Anthropic.RateLimitError) return 'Too many requests right now. Try again later.';
   if (e instanceof Anthropic.APIConnectionError) return 'No connection to the coach. Check your internet.';
-  if (e instanceof Anthropic.APIError) return `The coach service had a problem (${e.status ?? 'error'}).`;
+  // Show what the API said, so a problem can be reported and fixed.
+  if (e instanceof Anthropic.APIError) {
+    const detail = (e.error as { error?: { message?: string } } | undefined)?.error?.message ?? e.message;
+    return `The coach service had a problem (${e.status ?? 'error'}): ${detail}`;
+  }
   return e instanceof Error ? e.message : String(e);
 }
 
@@ -127,7 +244,7 @@ export async function runWeeklyReview(
   });
   let record: CoachRecord;
   try {
-    const { json, model } = await requestReview(apiKey, input);
+    const { json, model } = await requestReview(apiKey, input, undefined, db);
     record = { ok: true, review: reviewFrom(json, nextPlan, snap.week.doneKm, now, model) };
   } catch (e) {
     const prev = await loadCoachRecord(db, nextPlan.week);

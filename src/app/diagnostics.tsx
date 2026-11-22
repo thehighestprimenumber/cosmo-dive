@@ -18,6 +18,7 @@ import { useApp } from '../state/AppState';
 import { Card, Label, styles } from '../ui/components';
 import { widgetStateFrom } from '../widget/state';
 import { TodayWidget } from '../widget/TodayWidget';
+import { CoachDebug } from '../ui/CoachDebug';
 import { colors } from '../ui/theme';
 
 const DAYS = 14;
@@ -143,6 +144,7 @@ export default function DiagnosticsScreen() {
               setReloads((n) => n + 1);
             }} tintColor={colors.accent} />}
       >
+        <CoachDebug refreshKey={reloads} />
         {report && (
           <>
             <Card>

@@ -50,4 +50,33 @@ describe('the Claude request', () => {
     const err = await requestReview('k', {} as never, bad.f).catch((e) => e);
     expect(await coachErrorMessage(err)).toMatch(/API key was rejected/);
   });
+
+  it('if the request is rejected (400), asks again without schema enforcement and reads the JSON anyway', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    let n = 0;
+    const f = (async (_u: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      n++;
+      return n === 1
+        ? new Response(JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'bad schema' } }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+          })
+        : new Response(JSON.stringify(message('```json\n' + JSON.stringify(answer) + '\n```')), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+    }) as typeof fetch;
+    const r = await requestReview('k', {} as never, f);
+    expect(r.json).toEqual(answer);
+    expect(bodies[1]).not.toHaveProperty('fallbacks');
+    expect((bodies[1].output_config as Record<string, unknown>).format).toBeUndefined();
+    expect(String(bodies[1].system)).toContain('JSON schema');
+  });
+
+  it('schemas use anyOf for optional fields (no type arrays)', async () => {
+    const { REVIEW_SCHEMA } = await import('../domain/coach');
+    const { CHAT_SCHEMA, CHECKIN_SCHEMA } = await import('../domain/coachChat');
+    for (const s of [REVIEW_SCHEMA, CHAT_SCHEMA, CHECKIN_SCHEMA]) expect(JSON.stringify(s)).not.toMatch(/"type":\[/);
+  });
 });

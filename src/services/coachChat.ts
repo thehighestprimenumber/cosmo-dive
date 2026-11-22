@@ -109,7 +109,7 @@ export async function sendChat(
       ...past,
       { role: 'user' as const, content: `Current data (JSON):\n${JSON.stringify(context)}\n\nMessage:\n${user.text}` },
     ];
-    const { json } = await askClaude({ apiKey, system: SYSTEM, schema: CHAT_SCHEMA as unknown as Record<string, unknown>, messages, fetchImpl });
+    const { json } = await askClaude({ apiKey, system: SYSTEM, schema: CHAT_SCHEMA as unknown as Record<string, unknown>, messages, fetchImpl, db, purpose: 'chat' });
     answer = chatReplyFrom(json, checkContext(snap), newId(t + 1), Math.max(Date.now(), t + 1));
   } catch (e) {
     answer = { id: newId(t + 1), role: 'assistant', text: await coachErrorMessage(e), proposals: [], at: Math.max(Date.now(), t + 1), error: true };
@@ -227,6 +227,8 @@ export async function runDailyCheckin(
       apiKey,
       system: SYSTEM,
       schema: CHECKIN_SCHEMA as unknown as Record<string, unknown>,
+      db,
+      purpose: 'checkin',
       messages: [
         ...historyMessages(history, 10),
         {

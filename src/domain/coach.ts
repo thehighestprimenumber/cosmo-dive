@@ -304,7 +304,7 @@ export const REVIEW_SCHEMA = {
   type: 'object',
   properties: {
     summary: { type: 'string', description: 'How this week went, 2–4 short sentences.' },
-    tip: { type: ['string', 'null'], description: 'One concrete tip for next week, or null.' },
+    tip: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'One concrete tip for next week, or null.' },
     proposals: {
       type: 'array',
       description: `At most ${MAX_PROPOSALS} changes to next week's plan. Empty when the plan is fine.`,
@@ -312,9 +312,9 @@ export const REVIEW_SCHEMA = {
         type: 'object',
         properties: {
           type: { type: 'string', enum: ['move_session', 'scale_week'] },
-          session_id: { type: ['string', 'null'], description: 'move_session: the session id.' },
-          to: { type: ['string', 'null'], description: 'move_session: a free day of next week, YYYY-MM-DD.' },
-          factor: { type: ['number', 'null'], description: 'scale_week: e.g. 0.85 for 15% fewer km.' },
+          session_id: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'move_session: the session id.' },
+          to: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'move_session: a free day of next week, YYYY-MM-DD.' },
+          factor: { anyOf: [{ type: 'number' }, { type: 'null' }], description: 'scale_week: e.g. 0.85 for 15% fewer km.' },
           reason: { type: 'string', description: 'Why, in one or two sentences, addressed to the walker.' },
         },
         required: ['type', 'session_id', 'to', 'factor', 'reason'],

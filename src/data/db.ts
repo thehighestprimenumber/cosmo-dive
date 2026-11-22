@@ -89,6 +89,7 @@ export async function loadSettings(db: SQLiteDatabase, today: DateKey): Promise<
   delete stored.minDistanceKm;
   delete stored.widgetState; // stored here too, but it isn't a setting
   delete stored.weatherCache; // same
+  delete stored.coachDebugLog; // same
   return { ...DEFAULT_SETTINGS, startDate: today, ...(stored as Partial<Settings>) };
 }
 
@@ -221,6 +222,10 @@ export async function loadChat(db: SQLiteDatabase): Promise<ChatMessage[]> {
 
 export async function saveChatMessage(db: SQLiteDatabase, m: ChatMessage): Promise<void> {
   await db.runAsync('INSERT OR REPLACE INTO coach_chat (id, at, data) VALUES (?, ?, ?)', m.id, m.at, JSON.stringify(m));
+}
+
+export async function deleteChatMessages(db: SQLiteDatabase, ids: string[]): Promise<void> {
+  for (const id of ids) await db.runAsync('DELETE FROM coach_chat WHERE id = ?', id);
 }
 
 export async function clearChat(db: SQLiteDatabase): Promise<void> {

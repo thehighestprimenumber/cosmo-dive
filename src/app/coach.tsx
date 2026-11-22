@@ -3,12 +3,13 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { clearChat, loadChat } from '../data/db';
+import { clearChat, deleteChatMessages, loadChat } from '../data/db';
 import type { ChatAction, ChatMessage } from '../domain/coachChat';
 import { getApiKey } from '../services/coach';
 import { decideChatProposal, sendChat } from '../services/coachChat';
 import { useApp } from '../state/AppState';
 import { Button, styles } from '../ui/components';
+import { CoachDebug } from '../ui/CoachDebug';
 import { ProposalView } from '../ui/Proposal';
 import { colors, radius } from '../ui/theme';
 
@@ -29,6 +30,7 @@ export default function CoachScreen() {
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [debug, setDebug] = useState(false);
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
 
   useEffect(() => {
@@ -56,6 +58,16 @@ export default function CoachScreen() {
     } finally {
       setSending(false);
     }
+  };
+
+  /** Send the message that failed again (without keeping the failed attempt). */
+  const retry = async (errorId: string) => {
+    const i = messages.findIndex((x) => x.id === errorId);
+    const asked = [...messages.slice(0, i)].reverse().find((x) => x.role === 'user');
+    if (!asked) return;
+    await deleteChatMessages(db, [asked.id, errorId]);
+    setMessages((all) => all.filter((x) => x.id !== asked.id && x.id !== errorId));
+    await send(asked.text);
   };
 
   const decide = async (m: Extract<ChatMessage, { role: 'assistant' }>, pid: string, to: 'applied' | 'dismissed' | 'pending') => {
@@ -92,7 +104,9 @@ export default function CoachScreen() {
           <Pressable onPress={() => router.back()} hitSlop={8}>
             <Text style={[styles.body, { color: colors.accent }]}>‹ Back</Text>
           </Pressable>
-          <Text style={styles.h2}>🧠 Coach</Text>
+          <Pressable onPress={() => setDebug((d) => !d)} hitSlop={8}>
+            <Text style={styles.h2}>🧠 Coach{debug ? ' 🐞' : ''}</Text>
+          </Pressable>
           <Pressable onPress={clear} hitSlop={8} disabled={!messages.length}>
             <Text style={[styles.body, { color: messages.length ? colors.muted : 'transparent' }]}>Clear</Text>
           </Pressable>
@@ -104,6 +118,7 @@ export default function CoachScreen() {
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}
           keyboardShouldPersistTaps="handled"
         >
+          {debug && <CoachDebug refreshKey={messages.length + (sending ? 1 : 0)} />}
           {hasKey === false ? (
             <View>
               <Text style={[styles.muted, { marginBottom: 8 }]}>Add your Claude API key in Settings → AI coach to chat.</Text>
@@ -111,7 +126,7 @@ export default function CoachScreen() {
             </View>
           ) : messages.length === 0 ? (
             <Text style={[styles.muted, { marginBottom: 12 }]}>
-              Tell the coach what your watch can’t: a long shift, little time, something sore, how you feel. It answers
+              Tip: tap the title for debug info. Tell the coach what your watch can’t: a long shift, little time, something sore, how you feel. It answers
               with advice and, when it helps, changes to today or your week. Nothing changes until you tap Apply. It sees
               a summary of your goals and weeks, not your raw workouts.
             </Text>
@@ -126,6 +141,11 @@ export default function CoachScreen() {
               <View key={m.id} style={[bubble, { alignSelf: 'flex-start', backgroundColor: colors.card }]}>
                 {m.checkin ? <Text style={styles.label}>☀️ Morning check-in</Text> : null}
                 <Text style={[styles.body, m.error && { color: colors.missed }]}>{m.text}</Text>
+                {m.error && (
+                  <Pressable onPress={() => retry(m.id)} disabled={sending} hitSlop={8} style={{ marginTop: 6 }}>
+                    <Text style={[styles.body, { color: colors.accent, fontWeight: '700' }]}>↻ Try again</Text>
+                  </Pressable>
+                )}
                 {m.proposals.map((p) => (
                   <ProposalView
                     key={p.id}

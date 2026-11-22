@@ -2,6 +2,14 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: coach request fixes and debug info
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| 400 from the API | The answer schemas used `type: ["string","null"]` for optional fields; now `anyOf`. If a request is still rejected with a 400, it's retried once without schema enforcement or fallback, with the schema in the instructions, and the JSON is read leniently | First real chat message failed with a 400. `askClaude` in `src/services/coach.ts` |
+| Errors | The error bubble shows the API's own message, and has "↻ Try again" | |
+| Debug | Tap the Coach title (🐞), or Settings → Diagnostics: build, model, key saved (last 4 chars), coach switches, and the last 30 requests with purpose, strict/lenient, status, time, model, stop reason, tokens, error and request id. Selectable text | `src/ui/CoachDebug.tsx` |
+
 ## 2026-11-22: backup without remembering anything
 
 The owner will forget manual backups.
