@@ -70,7 +70,8 @@
       ],
       "expo-secure-store",
       "./plugins/withAbiSplits",
-      "expo-calendar"
+      "expo-calendar",
+      "./plugins/withBackupRules"
     ]
   }
 }

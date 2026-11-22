@@ -2,6 +2,18 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: backup without remembering anything
+
+The owner will forget manual backups.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Main backup | **Android Auto Backup** to the owner's Google account: automatic, about daily (charging, Wi-Fi), restored when the app is installed again on any phone with the same account (also for installed APKs) | No sign-in or server needed |
+| Bug fixed | expo-secure-store's backup rules list only shared preferences, which silently left the SQLite history **out** of the backup since the coach was added. Our own rules (`plugins/withBackupRules.js`) include `files/SQLite/` and keep the key store excluded | Keys can't be restored on another phone anyway |
+| Not included | The Claude API key (encrypted on the device); added again after a restore | |
+| Folder copy | Stays as an optional extra (weekly, last 8) | |
+| Check | Samsung: Settings → Accounts and backup → Back up data (Google Drive) must be on | |
+
 ## 2026-11-22: automatic weekly backup
 
 | Topic | Decision | Why / how to change |

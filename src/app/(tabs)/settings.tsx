@@ -173,10 +173,14 @@ function SettingsForm({ settings }: { settings: Settings }) {
 
         <Card>
           <Label>Backup</Label>
+          <Text style={[styles.body, { marginBottom: 4 }]}>☁️ Automatic, to your Google account</Text>
           <Text style={styles.muted}>
-            Your goal history only lives on this phone. Export it now and then (e.g. to Google Drive) so you can
-            import it on a new phone.
+            Android backs up Daily Spark’s history to your Google account by itself, about once a day while the phone
+            charges on Wi-Fi, and puts it back if you install the app again (on this or a new phone, same Google
+            account). Nothing to remember. Just check it’s on: Settings → Accounts and backup → Back up data (Google
+            Drive). Your Claude API key isn’t included: you’d add it again.
           </Text>
+          <Text style={[styles.label, { marginTop: 12 }]}>Extra copies, if you want them</Text>
           <Button title="Export history" variant="secondary" onPress={doExport} />
           <Button title="Import history" variant="secondary" onPress={doImport} disabled={syncing} />
           <AutoBackup settings={settings} />
@@ -410,10 +414,10 @@ function AutoBackup({ settings }: { settings: Settings }) {
 
   return (
     <View style={{ marginTop: 12 }}>
-      <Label>Automatic weekly backup</Label>
+      <Label>Weekly copy to a folder</Label>
       <Text style={styles.muted}>
-        Saves the history once a week to a folder on this phone and keeps the last 8. Android doesn’t let apps pick a
-        Google Drive folder directly, so pick a phone folder (e.g. Documents) and copy or sync it to Drive.
+        Optional: also saves a file once a week to a folder on this phone (keeps the last 8), handy to keep or move
+        to a computer.
       </Text>
       {settings.backupFolder ? (
         <>
