@@ -2,6 +2,18 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: faster builds
+
+Measured on build 40: phone Gradle build 13 min (both CPU types in one job), emulator check 3.7 min, watch 1.7 min, the rest ~1 min; ~20 min in all.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Gradle cache | `setup-gradle` with `cache-read-only: false` and `--build-cache` | By default only the default branch (`main`) writes the cache, so every build on this branch started cold |
+| Parallel | Phone APK split into two parallel jobs (arm64 for phones, x86_64 for the emulator check); the watch app in its own parallel job | Each job compiles native code for one CPU type only |
+| Docs only | Pushes that only change `docs/` or `.md` files don't build | |
+| Publish | After the phone APK passes the emulator check; the watch APK is added if its job worked | |
+| Not done | Over-the-air updates (expo-updates / EAS Update): JS-only changes would reach the phone in a couple of minutes without installing an APK. Needs an expo.dev account and a token in GitHub secrets | Owner's call |
+
 ## 2026-11-22: guided strength session on the phone too
 
 | Topic | Decision | Why / how to change |

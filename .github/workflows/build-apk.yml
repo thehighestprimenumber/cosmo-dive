@@ -6,6 +6,10 @@ name: Build APK
 on:
   push:
     branches: ['**']
+    # Docs-only changes don't need a new APK.
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   workflow_dispatch:
 
 permissions:
@@ -40,13 +44,18 @@ jobs:
             fi
           done
 
-  build:
+  # The phone app, one job per CPU type in parallel (arm64 for phones, x86_64
+  # for the emulator smoke test), so each compiles native code only once.
+  phone:
     needs: supersede
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # One build at a time per branch; a newer one waits instead of cancelling.
+    strategy:
+      matrix:
+        abi: [arm64-v8a, x86_64]
+    # One build at a time per branch and CPU type; a newer one waits instead of cancelling.
     concurrency:
-      group: apk-${{ github.ref }}
+      group: apk-${{ github.ref }}-${{ matrix.abi }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
@@ -58,21 +67,20 @@ jobs:
 
       - run: npm ci
 
-      - name: Typecheck
-        run: npx tsc --noEmit
-
-      - name: Lint
-        run: npx expo lint
-
-      - name: Unit tests
-        run: npm test
+      - name: Typecheck, lint, unit tests
+        if: matrix.abi == 'arm64-v8a'
+        run: npx tsc --noEmit && npx expo lint && npm test
 
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
 
+      # Save Gradle's caches from every branch (by default only the default branch
+      # writes them, so builds on this branch always started cold).
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: false
 
       # Each build gets a higher versionCode so it installs over the previous one.
       - name: Set version code
@@ -90,48 +98,70 @@ jobs:
       # Release build, signed with the project's fixed key (android/app/debug.keystore
       # from the template), so updates install over each other and keep your data.
       # R8 minification is off (app.json): it stripped WorkManager's database class
-      # and crashed the app on launch.
-      # arm64 for real phones, x86_64 so the emulator smoke test can run it.
+      # and crashed the app on launch. --build-cache reuses unchanged modules.
       - name: Build APK
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,x86_64
+        run: ./gradlew assembleRelease --no-daemon --build-cache -PreactNativeArchitectures=${{ matrix.abi }}
 
-      # One APK per CPU type (plugins/withAbiSplits.js): arm64 is published for
-      # phones, x86_64 is only for the emulator smoke test.
-      - name: Rename APKs
+      # One APK per CPU type (plugins/withAbiSplits.js).
+      - name: Rename APK
         run: |
-          cp android/app/build/outputs/apk/release/app-arm64-v8a-release.apk "daily-spark-${GITHUB_RUN_NUMBER}.apk"
-          cp android/app/build/outputs/apk/release/app-x86_64-release.apk "emulator-x86_64-${GITHUB_RUN_NUMBER}.apk"
+          if [ "${{ matrix.abi }}" = "arm64-v8a" ]; then OUT="daily-spark-${GITHUB_RUN_NUMBER}.apk"; else OUT="emulator-x86_64-${GITHUB_RUN_NUMBER}.apk"; fi
+          cp "android/app/build/outputs/apk/release/app-${{ matrix.abi }}-release.apk" "$OUT"
           ls -lh *.apk
-
-      # Watch app (Wear OS Tile). Signed with the phone app's key (from prebuild) so the
-      # Data Layer connects them. Doesn't block the phone APK while it's being tuned.
-      - uses: gradle/actions/setup-gradle@v5
-        with:
-          gradle-version: "8.11.1"
-
-      - name: Build watch APK
-        id: watch
-        continue-on-error: true
-        run: |
-          gradle -p wear :app:assembleRelease --no-daemon
-          cp wear/app/build/outputs/apk/release/app-release.apk "daily-spark-watch-${GITHUB_RUN_NUMBER}.apk"
-
-      - name: Report watch build
-        if: steps.watch.outcome == 'failure'
-        run: echo "::warning::Watch APK build failed; the phone APK is still published."
 
       - uses: actions/upload-artifact@v5
         with:
-          name: daily-spark-apk
-          path: |
-            daily-spark-*.apk
-            emulator-*.apk
+          name: apk-${{ matrix.abi }}
+          path: '*.apk'
+          retention-days: 14
+
+  # Watch app (Wear OS Tile, complication, pace guide, strength), in parallel.
+  # Signed with the phone app's key (from prebuild) so the Data Layer connects
+  # them. A failure here doesn't block the phone APK.
+  watch:
+    needs: supersede
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Only for android/app/debug.keystore (the shared signing key).
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "8.11.1"
+          cache-read-only: false
+
+      - name: Build watch APK
+        run: |
+          gradle -p wear :app:assembleRelease --no-daemon --build-cache
+          cp wear/app/build/outputs/apk/release/app-release.apk "daily-spark-watch-${GITHUB_RUN_NUMBER}.apk"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: apk-watch
+          path: daily-spark-watch-*.apk
           retention-days: 14
 
   # Opens the APK on an Android 14 emulator; fails if the app crashes on launch.
   smoke-test:
-    needs: build
+    needs: phone
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -139,7 +169,7 @@ jobs:
 
       - uses: actions/download-artifact@v5
         with:
-          name: daily-spark-apk
+          name: apk-x86_64
 
       - name: Enable KVM
         run: |
@@ -177,13 +207,21 @@ jobs:
             walkthrough.log
             shots/
 
+  # Publishes once the phone APK passed the emulator check; the watch APK is
+  # added when its build worked.
   publish:
-    needs: [build, smoke-test]
+    needs: [phone, smoke-test, watch]
+    if: ${{ !cancelled() && needs.phone.result == 'success' && needs.smoke-test.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v5
         with:
-          name: daily-spark-apk
+          name: apk-arm64-v8a
+
+      - uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          name: apk-watch
 
       - name: Publish release
         env:
