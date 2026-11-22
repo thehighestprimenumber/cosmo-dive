@@ -34,6 +34,8 @@ import {
   type WeekPlan,
 } from '../domain/plan';
 import type { WorkCalendar } from './calendar';
+import type { WeatherSource } from './weather';
+import { weatherSuggestions, type DayForecast, type WeatherSuggestion } from '../domain/weather';
 import { hardestIn, sessionToRate } from '../domain/effort';
 import { STRENGTH_XP, strengthDaysIn } from '../domain/strength';
 import { planVolume, rebalancedDayKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
@@ -95,6 +97,8 @@ export type Snapshot = {
   busyDays: DateKey[];
   /** Key sessions this sync moved off a work day. */
   shiftMoves: ShiftMove[];
+  /** The forecast (if you set your town) and walks worth moving because of it. */
+  weather: { forecast: DayForecast[]; suggestions: WeatherSuggestion[] };
   /** Strength & mobility sessions ticked off this week, and whether today. */
   strength: { thisWeek: DateKey[]; today: boolean };
   /** This week's km: planned, done, left, last week's, and each session's share. */
@@ -175,6 +179,8 @@ export async function refresh(
     todayKind?: RegularKind;
     /** Work days from your calendar (optional). */
     calendar?: WorkCalendar | null;
+    /** The forecast for your town (optional). */
+    weather?: WeatherSource | null;
   } = {},
 ): Promise<Snapshot> {
   const today = toDateKey(opts.now ?? new Date());
@@ -228,6 +234,7 @@ export async function refresh(
   const busy = opts.calendar
     ? await opts.calendar.busyDays(thisMonday, addDays(thisMonday, 13)).catch(() => [] as DateKey[])
     : [];
+  const forecast = opts.weather ? await opts.weather.forecast().catch(() => [] as DayForecast[]) : [];
   const strengthTotal = (await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM extras WHERE kind = 'strength'"))?.n ?? 0;
 
   const doneOn = (d: DateKey) => {
@@ -556,6 +563,12 @@ export async function refresh(
     toRate: sessionToRate([plan, await loadWeekPlan(db, addDays(thisMonday, -7))], today, doneOn, feelings),
     busyDays: busy,
     shiftMoves,
+    weather: {
+      forecast: forecast.filter((f) => f.date >= today),
+      suggestions: weatherSuggestions([plan, nextPlan], forecast, today, doneOn(today), busy).filter(
+        (x) => !settings.weatherDismissed.includes(x.key),
+      ),
+    },
     strength: { thisWeek: strengthDaysIn(strengthDays, thisMonday), today: strengthDays.includes(today) },
     plan,
     nextPlan,

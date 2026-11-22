@@ -2,6 +2,16 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: weather
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Source | Open-Meteo (free, no account or key). You set your town in Settings → Weather (search by name); only its coordinates (rounded to ~1 km) are sent. Forecast cached 3 hours | No location permission needed. `src/services/weather.ts` |
+| Bad weather | 70%+ chance of rain with 2+ mm, 33 °C or more, or 50+ km/h wind | `weatherIssue` |
+| Suggestion | A long or brisk walk on a bad-weather day (from today, within the 10-day forecast): move it to the nearest free day of the same week with fine weather, not a work day, 2+ days from the other sessions if possible. "Move to …" or "Not now" (remembered). Back-to-back weeks and trek days are left alone | It's a suggestion, not automatic: forecasts change. `weatherSuggestions` |
+| Week tab | A weather emoji next to each forecast day | |
+| Coach | Sees the next 8 days' forecast | |
+
 ## 2026-11-22: work shifts from the phone's calendar
 
 | Topic | Decision | Why / how to change |

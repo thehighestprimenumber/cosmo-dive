@@ -162,6 +162,10 @@ export type Settings = {
   lastCheckin: DateKey | null;
   /** Calendars whose events are work shifts (ids on this phone). Empty: not used. */
   workCalendars: string[];
+  /** Your town, for the forecast (only its coordinates are sent to Open-Meteo). */
+  weatherPlace: { name: string; lat: number; lon: number } | null;
+  /** Weather suggestions you answered "Not now" to. */
+  weatherDismissed: string[];
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -189,6 +193,8 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   dailyCheckin: true,
   lastCheckin: null,
   workCalendars: [],
+  weatherPlace: null,
+  weatherDismissed: [],
 };
 
 export type Progress = {

@@ -12,6 +12,7 @@ import { useApp } from '../../state/AppState';
 import type { Settings } from '../../domain/types';
 import { deleteApiKey, getApiKey, setApiKey } from '../../services/coach';
 import { hasCalendarAccess, listCalendars, requestCalendarAccess } from '../../services/calendar';
+import { findPlaces, type Place } from '../../services/weather';
 import { Button, Card, Field, Label, RestPerWeekPicker, styles } from '../../ui/components';
 
 export default function SettingsScreen() {
@@ -140,6 +141,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
         </Card>
 
         <WorkShifts settings={settings} />
+
+        <WeatherPlace settings={settings} />
 
         <CoachSettings settings={settings} />
 
@@ -315,6 +318,57 @@ function WorkShifts({ settings }: { settings: Settings }) {
         ) : (
           <Text style={styles.hint}>No calendars found on this phone.</Text>
         ))}
+    </Card>
+  );
+}
+
+/** Your town for the forecast: long and brisk walks get a heads-up about rain, heat or wind. */
+function WeatherPlace({ settings }: { settings: Settings }) {
+  const { updateSettings, refresh } = useApp();
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Place[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const search = async () => {
+    setBusy(true);
+    try {
+      setResults(await findPlaces(query));
+    } catch (e) {
+      Alert.alert('Weather', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pick = async (p: Place | null) => {
+    await updateSettings({ weatherPlace: p });
+    setResults(null);
+    setQuery('');
+    await refresh();
+  };
+
+  return (
+    <Card>
+      <Label>🌦️ Weather</Label>
+      <Text style={[styles.muted, { marginBottom: 8 }]}>
+        With your town set, the Week tab shows the forecast and suggests moving a long or brisk walk away from heavy
+        rain, 33 °C+ or strong wind. Only the town’s coordinates go to Open-Meteo (free, no account).
+      </Text>
+      {settings.weatherPlace ? (
+        <>
+          <Text style={[styles.body, { marginBottom: 4 }]}>📍 {settings.weatherPlace.name}</Text>
+          <Button title="Remove town" variant="secondary" onPress={() => pick(null)} />
+        </>
+      ) : (
+        <>
+          <Field label="Town" value={query} onChangeText={setQuery} placeholder="e.g. Rosario" />
+          <Button title={busy ? 'Searching…' : 'Search'} variant="secondary" onPress={search} disabled={busy || !query.trim()} />
+          {results?.length === 0 && <Text style={styles.hint}>Nothing found. Try another spelling.</Text>}
+          {results?.map((p) => (
+            <Button key={`${p.lat},${p.lon}`} title={p.name} variant="secondary" onPress={() => pick(p)} />
+          ))}
+        </>
+      )}
     </Card>
   );
 }

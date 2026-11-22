@@ -81,6 +81,8 @@ export type ChatContextInput = {
   strengthThisWeek?: number;
   /** Work days from your calendar (this week and next). */
   busyDays?: DateKey[];
+  /** The next days' forecast, if a town is set. */
+  forecast?: { date: DateKey; rainChance: number; rainMm: number; tempMax: number; windMax: number }[];
 };
 
 const weekView = (p: WeekPlan, today: DateKey, share: boolean) => {
@@ -148,6 +150,7 @@ export function buildChatContext(i: ChatContextInput) {
     recentWeeksKm: i.recentWeeksKm,
     strengthSessionsThisWeek: i.strengthThisWeek ?? 0,
     workDays: (i.busyDays ?? []).filter((d) => d >= today),
+    forecast: (i.forecast ?? []).slice(0, 8),
     streak: i.streak,
     restDaysPerWeek: settings.restDaysPerWeek,
     aimKmPerDay: settings.dailyTargetKm,

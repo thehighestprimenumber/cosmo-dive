@@ -70,6 +70,7 @@ function contextFor(snap: Snapshot, settings: Settings, now: Date) {
     feelings: snap.feelings,
     strengthThisWeek: snap.strength.thisWeek.length,
     busyDays: snap.busyDays,
+    forecast: snap.weather.forecast,
   });
 }
 

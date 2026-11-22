@@ -9,6 +9,7 @@ import { sourceFor } from '../../sources';
 import { useApp } from '../../state/AppState';
 import { Button, Card, Field, Label, ProgressBar, styles } from '../../ui/components';
 import { CoachCard } from '../../ui/CoachCard';
+import { weatherEmoji } from '../../domain/weather';
 import { colors, STATUS_COLOR } from '../../ui/theme';
 
 const SESSION_LABEL: Record<SessionKind, string> = {
@@ -31,6 +32,7 @@ export default function WeekScreen() {
         <Text style={[styles.h1, { marginBottom: 12 }]}>This week</Text>
 
         <VolumeCard />
+        <WeatherCard />
         <WeekList plan={snapshot.plan} />
 
         <CoachCard />
@@ -147,6 +149,10 @@ function WeekList({ plan }: { plan: WeekPlan }) {
               <Text style={[styles.body, { width: 92, fontWeight: d === today ? '800' : '400' }]}>
                 {d === today ? 'Today' : dayName(d)}
                 {snapshot.busyDays.includes(d) ? ' 💼' : ''}
+                {(() => {
+                  const f = snapshot.weather.forecast.find((x) => x.date === d);
+                  return f ? ` ${weatherEmoji(f)}` : '';
+                })()}
               </Text>
               <View style={{ flex: 1 }}>
                 {session ? (
@@ -436,6 +442,40 @@ function CycleCard() {
           await refresh({ regenerateToday: true });
         }}
       />
+    </Card>
+  );
+}
+
+/** Walks worth moving because of the forecast: Apply or Not now. */
+function WeatherCard() {
+  const { snapshot, settings, moveKeySession, updateSettings, refresh, syncing } = useApp();
+  if (!snapshot || !settings || !snapshot.weather.suggestions.length) return null;
+  return (
+    <Card style={{ borderColor: colors.pending }}>
+      <Label>🌦️ Weather</Label>
+      {snapshot.weather.suggestions.map((w) => (
+        <View key={w.key} style={{ marginTop: 6 }}>
+          <Text style={styles.body}>
+            {SESSION_LABEL[w.kind]} on {dayName(w.from)}: {w.why}. {dayName(w.to)} looks better ({w.better}).
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Button title={`Move to ${dayName(w.to)}`} disabled={syncing} onPress={() => moveKeySession(w.week, w.sessionId, w.to)} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Not now"
+                variant="secondary"
+                disabled={syncing}
+                onPress={async () => {
+                  await updateSettings({ weatherDismissed: [...settings.weatherDismissed, w.key].slice(-30) });
+                  await refresh();
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      ))}
     </Card>
   );
 }
