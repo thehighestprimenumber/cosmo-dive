@@ -2,6 +2,21 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: AI coach, step 2: the chat
+
+The owner chose rules as the base and AI for judgement and context ("hybrid"). The chat is where you tell the coach what the data can't show.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Where | "💬 Talk to the coach" on Today (with the coach on) and "💬 Chat" on the weekly review card. Starter chips for common situations | `src/app/coach.tsx` |
+| What it can propose | Up to 2 per answer: **rest today**, **switch today's goal type**, **move a key session** (this week from today on, or next week from Sunday evening), **scale a week** (this week: only lighter; next week: Sunday-review rules) | `checkChatAction` in `src/domain/coachChat.ts`. Rest-day counts, aim and trek goal stay manual |
+| Rest today | Today becomes a "🛌 Rest day, agreed with the coach", like a recovery day: resting doesn't use a rest day; a key session on today moves to the next free day. Stored as `settings.coachRestDay` (today only), so a later sync (e.g. sleep arriving) keeps it. Undo brings a normal goal back | `coachRestNotes`, sync |
+| Contradictions | Rest today + another goal type today, or two changes to the same thing, in one answer: only the first is kept | `chatReplyFrom` |
+| Context | Each message carries fresh data: now (day and time), today's goal and progress, this week so far, both plans with session ids and free days, recent weeks, streak and rest days left, aim, trek goal, cycle only if shared | `buildChatContext` |
+| Memory | The conversation is kept on the phone; the last 20 messages go back to the model, with what happened to each proposal ("applied", "skipped"). Failed requests show as a red bubble and aren't sent back. "Clear" forgets the conversation (applied changes stay) | `historyText`, DB v5 `coach_chat` |
+| Undo | Moves and week changes undo as in the review; rest today undoes; a goal-type switch is undone by picking another type on Today | |
+| Model, key, language | Same as the Sunday review (Claude Opus 5.5, medium effort, your key in encrypted storage, Rioplatense Spanish, gender-neutral) | `src/services/coachChat.ts` |
+
 ## 2026-11-22: recovery day after a very big day
 
 The owner expected the app to say "rest" the day after a huge walk.

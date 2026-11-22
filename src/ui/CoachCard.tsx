@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import { loadCoachRecord } from '../data/db';
 import type { CoachProposal, CoachRecord, CoachReview } from '../domain/coach';
 import { getApiKey, runWeeklyReview, setProposal } from '../services/coach';
 import { useApp } from '../state/AppState';
 import { Button, Card, Label, styles } from './components';
+import { ProposalView } from './Proposal';
 import { colors } from './theme';
 
 /**
@@ -69,7 +70,14 @@ export function CoachCard() {
 
   return (
     <Card>
-      <Label>🧠 Weekly review</Label>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Label>🧠 Weekly review</Label>
+        {hasKey ? (
+          <Pressable onPress={() => router.push('/coach')} hitSlop={8}>
+            <Text style={[styles.body, { color: colors.accent, fontWeight: '700' }]}>💬 Chat</Text>
+          </Pressable>
+        ) : null}
+      </View>
       {record?.ok ? (
         <ReviewBody review={record.review} busy={busy} onDecide={decide} />
       ) : hasKey === false ? (
@@ -114,36 +122,15 @@ function ReviewBody({
         <Text style={styles.hint}>No changes to next week: the plan fits.</Text>
       ) : (
         review.proposals.map((p) => (
-          <View
+          <ProposalView
             key={p.id}
-            style={{ borderTopWidth: 1, borderTopColor: colors.cardBorder, paddingTop: 10, marginTop: 6 }}
-          >
-            <Text style={[styles.body, { fontWeight: '700' }]}>{p.change}</Text>
-            <Text style={styles.muted}>{p.reason}</Text>
-            {p.adjusted ? <Text style={styles.hint}>⚖️ {p.adjusted}</Text> : null}
-            {p.status === 'pending' ? (
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Button title="Apply" onPress={() => onDecide(review, p, 'applied')} disabled={busy} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Button title="Not now" variant="secondary" onPress={() => onDecide(review, p, 'dismissed')} disabled={busy} />
-                </View>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={[styles.hint, { color: p.status === 'applied' ? colors.done : colors.muted }]}>
-                  {p.status === 'applied' ? '✓ Applied' : 'Skipped'}
-                </Text>
-                <Button
-                  title={p.status === 'applied' ? 'Undo' : 'Apply after all'}
-                  variant="secondary"
-                  onPress={() => onDecide(review, p, p.status === 'applied' ? 'pending' : 'applied')}
-                  disabled={busy}
-                />
-              </View>
-            )}
-          </View>
+            change={p.change}
+            reason={p.reason}
+            adjusted={p.adjusted}
+            status={p.status}
+            busy={busy}
+            onDecide={(to) => onDecide(review, p, to)}
+          />
         ))
       )}
       <Text style={[styles.hint, { marginTop: 8 }]}>

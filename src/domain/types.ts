@@ -154,6 +154,8 @@ export type Settings = {
   coachEnabled: boolean;
   /** Tell the coach that a light week is for your period, and when the next one is due. Off by default. */
   coachShareCycle: boolean;
+  /** A rest day agreed with the coach in the chat (today only). */
+  coachRestDay: { date: DateKey; reason: string } | null;
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -177,6 +179,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   achievements: {},
   coachEnabled: false,
   coachShareCycle: false,
+  coachRestDay: null,
 };
 
 export type Progress = {

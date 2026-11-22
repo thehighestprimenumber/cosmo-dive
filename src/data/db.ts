@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { CoachRecord } from '../domain/coach';
+import type { ChatMessage } from '../domain/coachChat';
 import type { WeekPlan } from '../domain/plan';
 import { DEFAULT_SETTINGS, type DailyGoal, type DateKey, type DayResult, type GoalMeta, type GoalSpec, type Settings } from '../domain/types';
 
@@ -42,6 +43,12 @@ const MIGRATIONS: string[] = [
      week TEXT PRIMARY KEY NOT NULL,
      data TEXT NOT NULL,
      updated_at TEXT NOT NULL
+   );`,
+  // v5: the coach chat.
+  `CREATE TABLE coach_chat (
+     id TEXT PRIMARY KEY NOT NULL,
+     at INTEGER NOT NULL,
+     data TEXT NOT NULL
    );`,
 ];
 
@@ -190,4 +197,19 @@ export async function saveCoachRecord(db: SQLiteDatabase, week: DateKey, record:
     JSON.stringify(record),
     new Date().toISOString(),
   );
+}
+
+// ---- coach chat ----
+
+export async function loadChat(db: SQLiteDatabase): Promise<ChatMessage[]> {
+  const rows = await db.getAllAsync<{ data: string }>('SELECT data FROM coach_chat ORDER BY at, id');
+  return rows.map((r) => JSON.parse(r.data) as ChatMessage);
+}
+
+export async function saveChatMessage(db: SQLiteDatabase, m: ChatMessage): Promise<void> {
+  await db.runAsync('INSERT OR REPLACE INTO coach_chat (id, at, data) VALUES (?, ?, ?)', m.id, m.at, JSON.stringify(m));
+}
+
+export async function clearChat(db: SQLiteDatabase): Promise<void> {
+  await db.runAsync('DELETE FROM coach_chat');
 }

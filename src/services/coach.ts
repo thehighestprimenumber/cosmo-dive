@@ -40,29 +40,50 @@ Write in Rioplatense Spanish (voseo), warm and direct, like a coach who knows th
 /** The SDK is loaded only when the coach is used, so it can never slow down or break app start. */
 const loadSdk = async (): Promise<typeof Anthropic> => (await import('@anthropic-ai/sdk')).default;
 
-/** One request to Claude for this week's review. Throws on network, auth or refusal problems. */
-export async function requestReview(
-  apiKey: string,
-  input: ReviewInput,
-  fetchImpl?: typeof fetch,
-): Promise<{ json: unknown; model: string }> {
+/**
+ * One request to Claude, answered as JSON matching `schema`. Throws on
+ * network, auth or refusal problems.
+ */
+export async function askClaude(opts: {
+  apiKey: string;
+  system: string;
+  messages: Anthropic.Beta.BetaMessageParam[];
+  schema: Record<string, unknown>;
+  fetchImpl?: typeof fetch;
+}): Promise<{ json: unknown; model: string }> {
   const Sdk = await loadSdk();
-  const client = new Sdk({ apiKey, maxRetries: 2, timeout: 120_000, ...(fetchImpl ? { fetch: fetchImpl } : {}) });
+  const client = new Sdk({
+    apiKey: opts.apiKey,
+    maxRetries: 2,
+    timeout: 120_000,
+    ...(opts.fetchImpl ? { fetch: opts.fetchImpl } : {}),
+  });
   const response = await client.beta.messages.create({
     model: COACH_MODEL,
     max_tokens: 16000,
     // If the model declines, the API retries on a fallback model in the same call.
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',
-    output_config: { effort: 'medium', format: { type: 'json_schema', schema: REVIEW_SCHEMA } },
-    system: SYSTEM,
-    messages: [{ role: 'user', content: `Here is the data (JSON):\n${JSON.stringify(input)}` }],
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: opts.schema } },
+    system: opts.system,
+    messages: opts.messages,
   });
   if (response.stop_reason === 'refusal') throw new Error('The coach couldn’t answer this time.');
   if (response.stop_reason === 'max_tokens') throw new Error('The coach’s answer was cut off.');
   const text = response.content.find((b) => b.type === 'text');
   if (!text || text.type !== 'text') throw new Error('The coach sent an empty answer.');
   return { json: JSON.parse(text.text), model: response.model };
+}
+
+/** One request to Claude for this week's review. */
+export function requestReview(apiKey: string, input: ReviewInput, fetchImpl?: typeof fetch) {
+  return askClaude({
+    apiKey,
+    system: SYSTEM,
+    schema: REVIEW_SCHEMA as unknown as Record<string, unknown>,
+    messages: [{ role: 'user', content: `Here is the data (JSON):\n${JSON.stringify(input)}` }],
+    fetchImpl,
+  });
 }
 
 /** Human-readable error for the app (no raw stack traces). */

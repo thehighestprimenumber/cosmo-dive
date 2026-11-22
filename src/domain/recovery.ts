@@ -22,3 +22,11 @@ export function recoveryAfter(yesterdayKm: number, regularDayKm: number): string
     `Rest today, or take an easy ${RECOVERY_MINUTES}-minute stroll if you feel like moving. Resting doesn't use one of your rest days or touch your streak.`,
   ];
 }
+
+/** Notes for a rest day you agreed with the AI coach in the chat. */
+export function coachRestNotes(reason: string): string[] {
+  return [
+    `🛌 Rest day, agreed with the coach: ${reason}`,
+    `An easy ${RECOVERY_MINUTES}-minute stroll is fine if you feel like moving. Resting doesn't use one of your rest days or touch your streak.`,
+  ];
+}

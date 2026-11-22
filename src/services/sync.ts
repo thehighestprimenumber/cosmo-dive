@@ -31,7 +31,7 @@ import {
 import { planVolume, rebalancedDayKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
 import { generateKeySession } from '../domain/sessions';
 import { withCoachFactor } from '../domain/coach';
-import { recoveryAfter } from '../domain/recovery';
+import { coachRestNotes, recoveryAfter } from '../domain/recovery';
 import { aimSuggestion, dailyAverageKm, walkingPace } from '../domain/aim';
 import {
   aimMonthTarget,
@@ -308,10 +308,12 @@ export async function refresh(
           : split.trekKm;
 
   // After a very big day, a key session that only slid onto today (missed earlier) slides on, or is dropped.
+  // A rest day agreed with the coach moves today's key session on too.
+  const coachRest = settings.coachRestDay?.date === today ? settings.coachRestDay : null;
   const slid = sessionOn(plan, today);
-  if (slid && isMovable(slid) && slid.day !== slid.plannedDay && !doneOn(today)) {
+  if (slid && isMovable(slid) && !doneOn(today) && (coachRest || slid.day !== slid.plannedDay)) {
     const y = addDays(today, -1);
-    if (recoveryAfter(weekKm(activities, y, rf, y), splitOf(plan).regularDayKm)) {
+    if (coachRest || recoveryAfter(weekKm(activities, y, rf, y), splitOf(plan).regularDayKm)) {
       const to = freeDays(plan, today, true, slid.id)[0];
       plan = to ? moveSession(plan, slid.id, to, today, true) : dropSession(plan, slid.id);
       await saveWeekPlan(db, plan);
@@ -393,7 +395,10 @@ export async function refresh(
             kind,
             dayKm,
             planNotes,
-            recoveryNotes: recoveryAfter(weekKm(activities, yesterday, rf, yesterday), split.regularDayKm),
+            recoveryNotes:
+              date === today && coachRest
+                ? coachRestNotes(coachRest.reason)
+                : recoveryAfter(weekKm(activities, yesterday, rf, yesterday), split.regularDayKm),
             light: !!volume.light,
             aerobic: isAerobicPhase(date, settings.event),
           });

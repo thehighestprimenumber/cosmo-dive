@@ -205,6 +205,9 @@ export default function TodayScreen() {
             )}
           </Card>
         )}
+        {settings.coachEnabled && snapshot && (
+          <Button title="💬 Talk to the coach" variant="secondary" onPress={() => router.push('/coach')} />
+        )}
         {goal === undefined && !syncing && snapshot && (
           <Card>
             <Text style={styles.muted}>No goal yet. Pull down to sync.</Text>
