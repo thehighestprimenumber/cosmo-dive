@@ -69,3 +69,9 @@ export function widgetStateFrom(snap: Snapshot, settings: Settings): WidgetState
     updatedAt: snap.syncedAt,
   };
 }
+
+/** Filled and empty parts of the progress bar, as whole-number weights (filled at least 2%, so it shows). */
+export function barWeights(fraction: number): [number, number] {
+  const filled = Math.min(100, Math.max(2, Math.round(fraction * 100)));
+  return [filled, Math.max(0, 100 - filled)];
+}

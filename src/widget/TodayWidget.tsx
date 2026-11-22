@@ -1,7 +1,7 @@
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import { toDateKey } from '../domain/dates';
 import type { DayStatus } from '../domain/types';
-import type { WidgetState } from './state';
+import { barWeights, type WidgetState } from './state';
 
 // Same palette as the app (src/ui/theme.ts), as hex for RemoteViews.
 const C = {
@@ -79,13 +79,14 @@ export function TodayWidget({ state }: { state: WidgetState | null }) {
           >
             <FlexWidget
               style={{
-                flex: Math.max(0.02, state.fraction),
+                // Widget weights are whole numbers (Android rounds 0.45 down to 0): use per cent.
+                flex: barWeights(state.fraction)[0],
                 height: 'match_parent',
                 backgroundColor: state.done ? C.done : C.accent,
                 borderRadius: 5,
               }}
             />
-            <FlexWidget style={{ flex: Math.max(0.001, 1 - state.fraction), height: 'match_parent' }} />
+            <FlexWidget style={{ flex: barWeights(state.fraction)[1], height: 'match_parent' }} />
           </FlexWidget>
           <TextWidget
             text={state.done ? `✅ ${state.detail}` : state.detail}

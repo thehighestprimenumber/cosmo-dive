@@ -48,4 +48,11 @@ describe('widget content', () => {
     expect(widgetStateFrom({ ...base, todayProgress: { ...base.todayProgress, done: true } }, settings).pace).toBeNull();
     expect(widgetStateFrom(snap, settings).pace).toBeNull();
   });
+
+  it('the progress bar uses whole-number weights (Android drops fractions)', async () => {
+    const { barWeights } = await import('./state');
+    expect(barWeights(0.45)).toEqual([45, 55]);
+    expect(barWeights(0)).toEqual([2, 98]);
+    expect(barWeights(1)).toEqual([100, 0]);
+  });
 });
