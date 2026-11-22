@@ -17,7 +17,7 @@ import { RateCard, StrengthCard } from '../../ui/TodayExtras';
 import { colors, STATUS_COLOR } from '../../ui/theme';
 
 export default function TodayScreen() {
-  const { settings, snapshot, syncing, error, sourceStatus, refresh, connect, updateSettings } = useApp();
+  const { settings, snapshot, syncing, error, sourceStatus, refresh, connect, updateSettings, updateReady, applyUpdate } = useApp();
   const done = !!snapshot?.todayProgress?.done;
   const game = snapshot?.game;
   const unlockedToday = game
@@ -128,6 +128,13 @@ export default function TodayScreen() {
               ↪️ Your {snapshot.forwarded.find((f) => f.day === snapshot.today)!.kind === 'brisk_walk' ? 'brisk walk' : 'long walk'}{' '}
               moved to today: its day passed before you could do it.
             </Text>
+          </Card>
+        )}
+
+        {updateReady && (
+          <Card style={{ borderColor: colors.accent }}>
+            <Text style={styles.body}>🆕 A new version of Daily Spark is ready.</Text>
+            <Button title="Restart to update" onPress={() => applyUpdate()} />
           </Card>
         )}
 

@@ -44,10 +44,96 @@ jobs:
             fi
           done
 
+  # Does this push need a new APK? Only when native code changed (the
+  # Expo fingerprint of the Android app) or the watch app changed; everything
+  # else reaches the phone as an over-the-air update.
+  plan:
+    needs: supersede
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.decide.outputs.native }}
+      fingerprint: ${{ steps.decide.outputs.fingerprint }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Compare with the last published APK
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FP=$(npx @expo/fingerprint fingerprint:generate --platform android | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).hash))")
+          echo "fingerprint=$FP" >> "$GITHUB_OUTPUT"
+          LAST=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName -q '.[0].tagName' || true)
+          BODY=$( [ -n "$LAST" ] && gh release view "$LAST" --repo "$GITHUB_REPOSITORY" --json body -q .body || true)
+          PREV_FP=$(echo "$BODY" | sed -n 's/^fingerprint: //p' | head -1)
+          PREV_SHA=$(echo "$BODY" | sed -n 's/^commit: //p' | head -1)
+          NATIVE=true
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ -n "$PREV_FP" ] && [ "$PREV_FP" = "$FP" ] \
+             && [ -n "$PREV_SHA" ] && git cat-file -e "$PREV_SHA" 2>/dev/null && git diff --quiet "$PREV_SHA" HEAD -- wear/; then
+            NATIVE=false
+          fi
+          echo "native=$NATIVE" >> "$GITHUB_OUTPUT"
+          echo "Fingerprint $FP (last APK: ${PREV_FP:-none} at ${PREV_SHA:-?}) → new APK needed: $NATIVE"
+
+  # Over-the-air update for the app's JavaScript (EAS Update), every push.
+  # Needs the EXPO_TOKEN secret; without it, this job does nothing.
+  update:
+    needs: plan
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+        if: env.EXPO_TOKEN != ''
+
+      - uses: actions/setup-node@v5
+        if: env.EXPO_TOKEN != ''
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+        if: env.EXPO_TOKEN != ''
+
+      - name: Typecheck, lint, unit tests
+        if: env.EXPO_TOKEN != ''
+        run: npx tsc --noEmit && npx expo lint && npm test
+
+      # First run only: create the EAS project and print its id, to be committed to app.json.
+      - name: Link the EAS project
+        id: link
+        if: env.EXPO_TOKEN != ''
+        run: |
+          if node -e 'process.exit(require("./app.json").expo.extra?.eas?.projectId ? 0 : 1)'; then
+            echo "linked=true" >> "$GITHUB_OUTPUT"
+          else
+            npx eas-cli@latest init --non-interactive --force
+            node -e 'const e=require("./app.json").expo; console.log("EAS projectId:", e.extra?.eas?.projectId, "owner:", e.owner)'
+            echo "::notice::EAS project created. Commit its projectId and owner to app.json to turn on updates."
+            echo "linked=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish the update
+        if: env.EXPO_TOKEN != '' && steps.link.outputs.linked == 'true'
+        run: |
+          npx eas-cli@latest channel:create production --non-interactive || true
+          npx eas-cli@latest update --branch production --platform android --non-interactive \
+            --message "$(git log -1 --pretty=%s)"
+
   # The phone app, one job per CPU type in parallel (arm64 for phones, x86_64
   # for the emulator smoke test), so each compiles native code only once.
   phone:
-    needs: supersede
+    needs: plan
+    if: needs.plan.outputs.native == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -120,7 +206,8 @@ jobs:
   # Signed with the phone app's key (from prebuild) so the Data Layer connects
   # them. A failure here doesn't block the phone APK.
   watch:
-    needs: supersede
+    needs: plan
+    if: needs.plan.outputs.native == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true
@@ -210,7 +297,7 @@ jobs:
   # Publishes once the phone APK passed the emulator check; the watch APK is
   # added when its build worked.
   publish:
-    needs: [phone, smoke-test, watch]
+    needs: [plan, phone, smoke-test, watch]
     if: ${{ !cancelled() && needs.phone.result == 'success' && needs.smoke-test.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -234,4 +321,7 @@ jobs:
             --target "${GITHUB_SHA}" \
             --prerelease \
             --title "Daily Spark build ${GITHUB_RUN_NUMBER} (${GITHUB_REF_NAME})" \
-            --notes "Built from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA}. Download the .apk on your phone to install or update."
+            --notes "Built from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA}. Download the .apk on your phone to install or update.
+
+          fingerprint: ${{ needs.plan.outputs.fingerprint }}
+          commit: ${GITHUB_SHA}"

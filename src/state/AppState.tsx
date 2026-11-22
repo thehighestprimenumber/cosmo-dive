@@ -11,6 +11,7 @@ import { afterSync } from '../services/afterSync';
 import { registerBackgroundSync } from '../services/backgroundSync';
 import { workCalendarFor } from '../services/calendar';
 import { weatherFor } from '../services/weather';
+import { applyUpdate, fetchUpdate } from '../services/updates';
 import { importWatchStrength } from '../services/watchStrength';
 import { strengthDoneOnWatch } from '../../modules/wear-sync';
 import type { SourceStatus } from '../sources/ActivitySource';
@@ -30,6 +31,9 @@ type Ctx = {
   logPeriodStart: () => Promise<void>;
   /** Re-reads settings from the database (e.g. after an import) and rebuilds history. */
   reloadAll: () => Promise<void>;
+  /** A newer version of the app was downloaded: restart to use it. */
+  updateReady: boolean;
+  applyUpdate: () => Promise<void>;
   /** Asks for data source permission; returns true when ready. */
   connect: (dataSource?: Settings['dataSource']) => Promise<boolean>;
 };
@@ -43,6 +47,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [sourceStatus, setSourceStatus] = useState<SourceStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [updateReady, setUpdateReady] = useState(false);
   const settingsRef = useRef<Settings | null>(null);
   const snapshotRef = useRef<Snapshot | null>(null);
   const inFlight = useRef<Promise<void> | null>(null);
@@ -147,6 +152,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     await doRefresh({ fullRebuild: true });
   }, [db, doRefresh]);
 
+  // App updates over the air: at start, a quick check applies a new version right away;
+  // later (back in the foreground) a downloaded one waits for "Restart".
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const started = Date.now();
+      const ready = await fetchUpdate();
+      if (!live || !ready) return;
+      if (Date.now() - started < 5000) await applyUpdate().catch(() => setUpdateReady(true));
+      else setUpdateReady(true);
+    })();
+    const sub = RNAppState.addEventListener('change', async (state) => {
+      if (state === 'active' && (await fetchUpdate())) setUpdateReady(true);
+    });
+    return () => {
+      live = false;
+      sub.remove();
+    };
+  }, []);
+
   // Initial load.
   useEffect(() => {
     (async () => {
@@ -182,6 +207,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         logPeriodStart,
         reloadAll,
         connect,
+        updateReady,
+        applyUpdate: async () => {
+          await applyUpdate();
+        },
       }}
     >
       {children}

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { COACH_MODEL, getApiKey, loadCoachLog, type CoachCall } from '../services/coach';
 import { useApp } from '../state/AppState';
+import { updateInfo } from '../services/updates';
 import { Label, styles } from './components';
 import { colors } from './theme';
 
@@ -34,6 +35,7 @@ export function CoachDebug({ refreshKey = 0 }: { refreshKey?: number }) {
   const time = (ms: number) => new Date(ms).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const lines = [
     `Build ${build} · model ${COACH_MODEL}`,
+    updateInfo(),
     `API key: ${key ? `saved (…${key.slice(-4)})` : 'none'}`,
     `Coach ${settings?.coachEnabled ? 'on' : 'off'} · check-in ${settings?.dailyCheckin ? 'on' : 'off'} (last ${settings?.lastCheckin ?? 'never'}) · share cycle ${settings?.coachShareCycle ? 'on' : 'off'}`,
   ];

@@ -2,6 +2,18 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: over-the-air updates (EAS Update)
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| What | expo-updates: changes that don't touch native code reach the phone as an update (no APK). The app checks at start (a quick one applies right away) and when it comes back to the foreground ("🆕 Restart to update" on Today) | `src/services/updates.ts` |
+| When an APK is still needed | Native changes: the Expo fingerprint of the Android app differs from the last published APK's (stored in the release notes), or `wear/` changed. Otherwise no APK is built at all | `plan` job in the workflow |
+| Compatibility | `runtimeVersion` policy "fingerprint": an update only reaches an APK with the same native code | An incompatible update can't crash an older APK |
+| CI | `update` job on every push: typecheck, lint, tests, then `eas update --branch production` (channel `production`). Needs the `EXPO_TOKEN` secret; without it the job does nothing | |
+| Account | The owner's free expo.dev account; the token lives only in GitHub secrets | |
+| Version code | Still set by CI per build; it doesn't change the fingerprint (checked) | |
+| Diagnostics | Shows the running update id, date, channel and runtime | |
+
 ## 2026-11-22: faster builds
 
 Measured on build 40: phone Gradle build 13 min (both CPU types in one job), emulator check 3.7 min, watch 1.7 min, the rest ~1 min; ~20 min in all.
