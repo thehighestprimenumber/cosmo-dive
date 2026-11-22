@@ -156,6 +156,10 @@ export type Settings = {
   coachShareCycle: boolean;
   /** A rest day agreed with the coach in the chat (today only). */
   coachRestDay: { date: DateKey; reason: string } | null;
+  /** The coach checks in on mornings when something stands out (with the coach on). */
+  dailyCheckin: boolean;
+  /** Last day the morning check-in was considered (so it runs once a day). */
+  lastCheckin: DateKey | null;
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -180,6 +184,8 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   coachEnabled: false,
   coachShareCycle: false,
   coachRestDay: null,
+  dailyCheckin: true,
+  lastCheckin: null,
 };
 
 export type Progress = {

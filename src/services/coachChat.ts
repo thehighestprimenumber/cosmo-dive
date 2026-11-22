@@ -5,6 +5,7 @@ import {
   buildChatContext,
   CHAT_HISTORY,
   CHAT_SCHEMA,
+  CHECKIN_SCHEMA,
   chatReplyFrom,
   historyText,
   MAX_CHAT_PROPOSALS,
@@ -12,6 +13,7 @@ import {
   type ChatMessage,
   type ChatProposal,
 } from '../domain/coachChat';
+import { checkinReasons } from '../domain/checkin';
 import { normalizePlan } from '../domain/plan';
 import type { RegularKind, Settings } from '../domain/types';
 import { askClaude, coachErrorMessage, getApiKey } from './coach';
@@ -43,6 +45,37 @@ function checkContext(snap: Snapshot): ChatCheckContext {
   };
 }
 
+function contextFor(snap: Snapshot, settings: Settings, now: Date) {
+  return buildChatContext({
+    today: snap.today,
+    now,
+    todayGoal: snap.todayGoal,
+    todayProgress: snap.todayProgress,
+    todayNotes: snap.todayNotes,
+    todayRecovery: snap.todayRecovery,
+    plan: snap.plan,
+    nextPlan: snap.nextPlan,
+    days: snap.days,
+    doneKm: snap.week.doneKm,
+    recentWeeksKm: snap.week.recentWeeksKm,
+    streak: {
+      current: snap.streak.current,
+      longest: snap.streak.longest,
+      freezes: snap.streak.freezes,
+      restLeftThisWeek: snap.streak.restLeftThisWeek,
+    },
+    settings,
+    nextPeriodStart: snap.cycle?.next?.start ?? null,
+  });
+}
+
+/** Recent conversation as API messages (must start with the walker). */
+function historyMessages(history: ChatMessage[], n: number) {
+  const recent = history.filter((m) => !(m.role === 'assistant' && m.error)).slice(-n);
+  while (recent.length && recent[0].role !== 'user') recent.shift();
+  return recent.map((m) => ({ role: m.role, content: historyText(m) }));
+}
+
 const newId = (now: number) => `${now}-${Math.random().toString(36).slice(2, 7)}`;
 
 /**
@@ -65,37 +98,12 @@ export async function sendChat(
   try {
     const apiKey = await getApiKey();
     if (!apiKey) throw new Error('Add your Claude API key in Settings first.');
-    const context = buildChatContext({
-      today: snap.today,
-      now,
-      todayGoal: snap.todayGoal,
-      todayProgress: snap.todayProgress,
-      todayNotes: snap.todayNotes,
-      todayRecovery: snap.todayRecovery,
-      plan: snap.plan,
-      nextPlan: snap.nextPlan,
-      days: snap.days,
-      doneKm: snap.week.doneKm,
-      recentWeeksKm: snap.week.recentWeeksKm,
-      streak: {
-        current: snap.streak.current,
-        longest: snap.streak.longest,
-        freezes: snap.streak.freezes,
-        restLeftThisWeek: snap.streak.restLeftThisWeek,
-      },
-      settings,
-      nextPeriodStart: snap.cycle?.next?.start ?? null,
-    });
-    const recent = history.slice(-CHAT_HISTORY);
-    // The conversation must start with the walker; consecutive same-role turns are merged by the API.
-    while (recent.length && recent[0].role !== 'user') recent.shift();
-    const messages = recent.map((m, i) => {
-      const last = i === recent.length - 1;
-      return {
-        role: m.role,
-        content: last ? `Current data (JSON):\n${JSON.stringify(context)}\n\nMessage:\n${m.text}` : historyText(m),
-      } as const;
-    });
+    const context = contextFor(snap, settings, now);
+    const past = historyMessages(history.filter((m) => m.id !== user.id), CHAT_HISTORY - 1);
+    const messages = [
+      ...past,
+      { role: 'user' as const, content: `Current data (JSON):\n${JSON.stringify(context)}\n\nMessage:\n${user.text}` },
+    ];
     const { json } = await askClaude({ apiKey, system: SYSTEM, schema: CHAT_SCHEMA as unknown as Record<string, unknown>, messages, fetchImpl });
     answer = chatReplyFrom(json, checkContext(snap), newId(t + 1), Math.max(Date.now(), t + 1));
   } catch (e) {
@@ -174,4 +182,62 @@ export async function decideChatProposal(
   };
   await saveChatMessage(db, next);
   return { ...result, message: next };
+}
+
+const CHECKIN_PROMPT = `This is your morning check-in, not a message from the walker: they'll get it as a notification. It runs only on days when something stands out (reasons below). Write 1–3 short sentences for today, and propose a change only if it clearly helps. If nothing useful needs saying (e.g. a follow-up that doesn't matter today), set worth_sending to false.`;
+
+/**
+ * The morning check-in: on days when something stands out, the coach writes
+ * first (saved in the chat, with proposals to apply). Returns the message, or
+ * null on an ordinary day / nothing worth sending / an error.
+ */
+export async function runDailyCheckin(
+  db: SQLiteDatabase,
+  snap: Snapshot,
+  settings: Settings,
+  now = new Date(),
+  fetchImpl?: typeof fetch,
+): Promise<Extract<ChatMessage, { role: 'assistant' }> | null> {
+  const history = await loadChat(db);
+  const lastUser = [...history].reverse().find((m) => m.role === 'user');
+  const reasons = checkinReasons({
+    today: snap.today,
+    todayRecovery: snap.todayRecovery,
+    todayReadiness: snap.todayReadiness,
+    days: snap.days,
+    weekPlannedKm: snap.week.volume.km,
+    weekDoneKm: snap.week.doneKm,
+    restLeftThisWeek: snap.streak.restLeftThisWeek,
+    streak: snap.streak.current,
+    lastUserMessageAt: lastUser?.at ?? null,
+    now,
+  });
+  if (!reasons.length || snap.todayProgress?.done) return null;
+  const apiKey = await getApiKey();
+  if (!apiKey) return null;
+  try {
+    const context = contextFor(snap, settings, now);
+    const { json } = await askClaude({
+      apiKey,
+      system: SYSTEM,
+      schema: CHECKIN_SCHEMA as unknown as Record<string, unknown>,
+      messages: [
+        ...historyMessages(history, 10),
+        {
+          role: 'user',
+          content: `${CHECKIN_PROMPT}\n\nWhy today:\n- ${reasons.join('\n- ')}\n\nCurrent data (JSON):\n${JSON.stringify(context)}`,
+        },
+      ],
+      fetchImpl,
+    });
+    if ((json as { worth_sending?: unknown })?.worth_sending === false) return null;
+    const t = now.getTime();
+    const m = chatReplyFrom(json, checkContext(snap), newId(t), t);
+    if (m.role !== 'assistant') return null;
+    const message = { ...m, checkin: true };
+    await saveChatMessage(db, message);
+    return message;
+  } catch {
+    return null; // a missed check-in is fine
+  }
 }

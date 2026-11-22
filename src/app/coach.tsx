@@ -124,6 +124,7 @@ export default function CoachScreen() {
               </View>
             ) : (
               <View key={m.id} style={[bubble, { alignSelf: 'flex-start', backgroundColor: colors.card }]}>
+                {m.checkin ? <Text style={styles.label}>☀️ Morning check-in</Text> : null}
                 <Text style={[styles.body, m.error && { color: colors.missed }]}>{m.text}</Text>
                 {m.proposals.map((p) => (
                   <ProposalView

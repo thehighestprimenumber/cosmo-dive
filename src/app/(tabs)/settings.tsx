@@ -242,6 +242,14 @@ function CoachSettings({ settings }: { settings: Settings }) {
         </>
       )}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+        <Text style={[styles.body, { flex: 1 }]}>Morning check-in</Text>
+        <Switch value={settings.dailyCheckin} onValueChange={(v) => void updateSettings({ dailyCheckin: v })} />
+      </View>
+      <Text style={styles.hint}>
+        Only on mornings when something stands out: after a very big day, a short night, two days without the goal,
+        falling behind on the week, no rest days left, or something you told the coach. Ordinary days: no message.
+      </Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
         <Text style={[styles.body, { flex: 1 }]}>Share my cycle with the coach</Text>
         <Switch value={settings.coachShareCycle} onValueChange={(v) => void updateSettings({ coachShareCycle: v })} />
       </View>

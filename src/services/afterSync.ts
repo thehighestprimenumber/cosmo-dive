@@ -7,8 +7,10 @@ import { saveWidgetState } from '../widget/store';
 import { updateTodayWidget } from '../widget/update';
 import { sendStateToWatch } from '../../modules/wear-sync';
 import { shouldAutoReview } from '../domain/coach';
+import { checkinDue } from '../domain/checkin';
+import { runDailyCheckin } from './coachChat';
 import { getApiKey, runWeeklyReview } from './coach';
-import { notifyAchievements, notifyCoachReview, notifyAimReached, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
+import { notifyAchievements, notifyCheckin, notifyCoachReview, notifyAimReached, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
 import type { Snapshot } from './sync';
 
 /**
@@ -53,6 +55,19 @@ export async function afterSync(
     } catch {
       // The coach is optional; never break syncing.
     }
+  }
+  // Morning check-in: only on days when something stands out (once a day).
+  if (settings.coachEnabled && settings.dailyCheckin && checkinDue(new Date(), snap.today, settings.lastCheckin, settings.morningReminder)) {
+    const checkin = (async () => {
+      await saveSettings(db, { lastCheckin: snap.today });
+      settings.lastCheckin = snap.today;
+      const m = await runDailyCheckin(db, snap, settings);
+      if (m) await notifyCheckin(m.text, m.proposals.length);
+    })().catch(() => {
+      // The coach is optional; never break syncing.
+    });
+    // In the app, don't hold up the sync spinner while the coach thinks.
+    if (inBackground) await checkin;
   }
   await updateEvening(settings, snap.today, snap.todayGoal, done, snap.streak.current);
   await updateNudge(settings, snap.today, snap.todayGoal, done, snap.usualTime);

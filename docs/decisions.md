@@ -2,6 +2,17 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: AI coach, step 3: morning check-in
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| When | Once a day, from your morning reminder until noon, **only if something stands out**: today is a recovery day; readiness is low; the last 2 days went without the goal (a rested recovery day doesn't count); from Thursday, under 60% of where the week should be; no rest days left with a 3+ day streak; or you wrote to the coach in the last 36 hours. Ordinary days: no request at all. Not when today's goal is already done | `checkinReasons` / `checkinDue` in `src/domain/checkin.ts` |
+| Worth sending | The coach can still decide there's nothing useful to say (`worth_sending: false`): then nothing is sent | Keeps it from becoming noise |
+| What you get | A notification ("☀️ A note from your coach" / "…has a suggestion for today") and a card on Today; the note is saved in the chat with Apply buttons, same changes and rules as the chat | `runDailyCheckin` in `src/services/coachChat.ts` |
+| Background vs app | Runs in the background sync, or when you open the app in that window (without holding up the sync) | `afterSync` |
+| Switch | Settings → AI coach → Morning check-in (on by default; needs the coach on and a key) | |
+| Cost | Only on days with a reason: a few cents a month | |
+
 ## 2026-11-22: CI builds only the last of quick pushes
 
 The owner asked: when builds are less than 5 minutes apart, cancel all but the last.

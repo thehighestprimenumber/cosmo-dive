@@ -8,7 +8,7 @@ import { refresh } from './sync';
 
 vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn(async () => 'sk-ant-test'), setItemAsync: vi.fn(), deleteItemAsync: vi.fn() }));
 
-const { decideChatProposal, sendChat } = await import('./coachChat');
+const { decideChatProposal, runDailyCheckin, sendChat } = await import('./coachChat');
 
 const MON = '2026-11-23';
 const WED = addDays(MON, 2);
@@ -123,5 +123,27 @@ describe('coach chat', () => {
     await sendChat(db, '¿Estás?', snap, base, at(WED, 8), f);
     const sent = bodies[0].messages as { role: string }[];
     expect(sent.map((m) => m.role)).toEqual(['user', 'user']);
+  });
+
+  it('morning check-in: nothing on an ordinary day; after a talk, a note saved in the chat', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const snap = await refresh(db, source, base, { now: at(WED, 8) });
+    const { f, bodies } = claudeSays({ reply: '¿Cómo arrancó la guardia?', proposals: [], worth_sending: true });
+    expect(await runDailyCheckin(db, snap, base, at(WED, 8), f)).toBeNull();
+    expect(bodies).toHaveLength(0); // ordinary day: no request at all
+
+    const talk = claudeSays({ reply: 'Suerte mañana.', proposals: [] });
+    await sendChat(db, 'Mañana tengo guardia de 12 horas', snap, base, at(addDays(WED, -1), 20), talk.f);
+    const m = await runDailyCheckin(db, snap, base, at(WED, 8), f);
+    expect(m).toMatchObject({ role: 'assistant', checkin: true, text: '¿Cómo arrancó la guardia?' });
+    const last = bodies[0].messages as { role: string; content: string }[];
+    expect(last[0].content).toBe('Mañana tengo guardia de 12 horas');
+    expect(last.at(-1)!.content).toContain('You talked recently');
+    expect((await loadChat(db)).at(-1)).toMatchObject({ checkin: true });
+
+    // Nothing worth sending: nothing saved.
+    const quiet = claudeSays({ reply: '-', proposals: [], worth_sending: false });
+    expect(await runDailyCheckin(db, snap, base, at(WED, 9), quiet.f)).toBeNull();
   });
 });

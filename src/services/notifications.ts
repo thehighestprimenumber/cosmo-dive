@@ -77,6 +77,17 @@ export async function notifyCoachReview(summary: string, proposals: number): Pro
   });
 }
 
+/** The coach's morning check-in. */
+export async function notifyCheckin(text: string, proposals: number): Promise<void> {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: proposals ? '☀️ Your coach has a suggestion for today' : '☀️ A note from your coach',
+      body: text.length > 160 ? text.slice(0, 157) + '…' : text,
+    },
+    trigger: { channelId: CHANNEL },
+  });
+}
+
 /** New achievements unlocked by a background sync. */
 export async function notifyAchievements(titles: string[]): Promise<void> {
   if (!titles.length) return;

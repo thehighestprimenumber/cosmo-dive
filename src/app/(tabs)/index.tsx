@@ -1,11 +1,14 @@
 import { router } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
+import { loadChat } from '../../data/db';
+import type { ChatMessage } from '../../domain/coachChat';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatKm, formatMinutes, formatValue, goalEmoji, goalSubtitle, goalTitle } from '../../domain/format';
 import { weekSummary } from '../../domain/summary';
 import type { Activity, RegularKind } from '../../domain/types';
-import { addDays } from '../../domain/dates';
+import { addDays, toDateKey } from '../../domain/dates';
 import { ACHIEVEMENTS } from '../../domain/game';
 import { sourceFor } from '../../sources';
 import { useApp } from '../../state/AppState';
@@ -205,9 +208,7 @@ export default function TodayScreen() {
             )}
           </Card>
         )}
-        {settings.coachEnabled && snapshot && (
-          <Button title="💬 Talk to the coach" variant="secondary" onPress={() => router.push('/coach')} />
-        )}
+        {settings.coachEnabled && snapshot && <CoachNote today={snapshot.today} syncedAt={snapshot.syncedAt} />}
         {goal === undefined && !syncing && snapshot && (
           <Card>
             <Text style={styles.muted}>No goal yet. Pull down to sync.</Text>
@@ -389,5 +390,36 @@ function ActivityRow({ a }: { a: Activity }) {
       </Text>
       <Text style={styles.muted}>{parts.join(' · ')}</Text>
     </View>
+  );
+}
+
+/** Today's morning check-in from the coach (if any), and the way into the chat. */
+function CoachNote({ today, syncedAt }: { today: string; syncedAt: number }) {
+  const db = useSQLiteContext();
+  const [note, setNote] = useState<Extract<ChatMessage, { role: 'assistant' }> | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadChat(db)
+      .then((all) => {
+        const last = [...all].reverse().find((m) => m.role === 'assistant' && m.checkin);
+        if (live) setNote(last?.role === 'assistant' && toDateKey(last.at) === today ? last : null);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [db, today, syncedAt]);
+  if (!note) return <Button title="💬 Talk to the coach" variant="secondary" onPress={() => router.push('/coach')} />;
+  const pending = note.proposals.filter((p) => p.status === 'pending').length;
+  return (
+    <Pressable onPress={() => router.push('/coach')}>
+      <Card style={{ borderColor: colors.accent }}>
+        <Text style={styles.label}>☀️ From your coach</Text>
+        <Text style={styles.body}>{note.text}</Text>
+        <Text style={[styles.hint, { color: colors.accent }]}>
+          {pending ? `${pending} suggestion${pending > 1 ? 's' : ''} to look at · ` : ''}Open the chat ›
+        </Text>
+      </Card>
+    </Pressable>
   );
 }
