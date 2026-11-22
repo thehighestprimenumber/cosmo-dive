@@ -35,6 +35,7 @@ object StateStore {
                 latest?.let {
                     save(context, it.second)
                     TileService.getUpdater(context).requestUpdate(SparkTileService::class.java)
+                    SparkComplicationService.requestUpdate(context)
                 }
                 then()
             }

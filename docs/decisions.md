@@ -2,6 +2,15 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-22: watch complication
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Types | Ranged value (progress ring 0–100% with "62%" or "✓" and 🔥streak), short text ("62%" / "✓" with 🔥streak), long text (goal · progress, streak) | The common slots on Galaxy Watch faces. `SparkComplicationService.kt` |
+| Data | The same state the Tile uses (sent by the phone after every sync); refreshed when it arrives, and every 30 minutes by the system. From another day: shows "—" / "New day: sync on the phone" instead of old numbers | |
+| Tap | Opens the watch app's detail screen | |
+| Live pace | Not in a complication: it can't follow a walk in real time. That's the pace guide (next) | |
+
 ## 2026-11-22: coach request fixes and debug info
 
 | Topic | Decision | Why / how to change |

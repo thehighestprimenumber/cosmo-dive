@@ -15,5 +15,6 @@ class StateListenerService : WearableListenerService() {
             StateStore.save(this, json)
         }
         TileService.getUpdater(this).requestUpdate(SparkTileService::class.java)
+        SparkComplicationService.requestUpdate(this)
     }
 }
