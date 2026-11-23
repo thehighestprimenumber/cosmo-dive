@@ -62,6 +62,16 @@ export function weekKm(activities: Activity[], monday: DateKey, rideFactor: numb
   );
 }
 
+/** Average km of the last `n` complete weeks with any watch data before `monday` (null without any). */
+export function recentWeeksKm(activities: Activity[], monday: DateKey, rideFactor: number, n = 2): number | null {
+  const weeks: number[] = [];
+  for (let w = 1; w <= 6 && weeks.length < n; w++) {
+    const m = addDays(monday, -7 * w);
+    if (activities.some((a) => mondayOf(toDateKey(a.start)) === m)) weeks.push(weekKm(activities, m, rideFactor));
+  }
+  return weeks.length ? weeks.reduce((t, k) => t + k, 0) / weeks.length : null;
+}
+
 /**
  * Your typical week: median km of the last 4 complete weeks that have any
  * watch data (weeks without the watch don't drag it down). Needs 2 such weeks.
@@ -100,9 +110,11 @@ export type VolumeInput = {
   periodWeek: boolean | null;
   /** The hardest key session last week, as you rated it (1–10). */
   lastWeekHardest?: number | null;
+  /** What you actually walked lately: the average of your last 2 weeks with data. */
+  recentKm?: number | null;
 };
 
-export function planVolume({ monday, settings, startKm, prev, periodWeek, lastWeekHardest }: VolumeInput): WeekVolume {
+export function planVolume({ monday, settings, startKm, prev, periodWeek, lastWeekHardest, recentKm }: VolumeInput): WeekVolume {
   const notes: string[] = [];
   const destination = destinationKm(settings, startKm);
   const ev = settings.event && settings.event.date >= monday ? settings.event : null;
@@ -126,6 +138,11 @@ export function planVolume({ monday, settings, startKm, prev, periodWeek, lastWe
   // Progression level.
   let base = prev ? prev.volume.baseKm : startKm;
   if (!prev) notes.push(`Starts from your typical week: ${round1(startKm)} km.`);
+  // The plan never stays below what you actually walk: catch up with your last 2 weeks.
+  if (recentKm != null && recentKm > base && base < destination) {
+    base = Math.min(destination, recentKm);
+    notes.push(`Catching up with what you actually walk: ${round1(recentKm)} km a week lately.`);
+  }
   const prevWasEasy = !!prev && (prev.volume.light || prev.volume.preEvent || prev.volume.eventWeek);
   if (prev && !light && !eventWeek && !preEvent && base < destination) {
     const done = prev && prev.volume.km > 0 ? prev.actualKm / prev.volume.km : 1;

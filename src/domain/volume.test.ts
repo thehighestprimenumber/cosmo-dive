@@ -71,6 +71,24 @@ describe('weekly volume', () => {
     expect(planVolume({ monday: addDays(MON, 7), settings: s, startKm: 20, prev: prev(10), periodWeek: false }).km).toBe(18);
   });
 
+  it('catches up with what you actually walk (last 2 weeks), then grows from there', () => {
+    const s = { ...base, dailyTargetKm: 5 }; // destination 35
+    const first = planVolume({ monday: MON, settings: s, startKm: 14.7, periodWeek: false });
+    const next = planVolume({ monday: addDays(MON, 7), settings: s, startKm: 14.7, prev: { volume: first, actualKm: 23.2 }, periodWeek: false, recentKm: 24 });
+    expect(next.baseKm).toBe(26.4); // 24 km lately, +10%
+    expect(next.notes[0]).toContain('Catching up');
+    // Never past the destination; and doing less than the plan doesn't lower it here.
+    expect(planVolume({ monday: MON, settings: s, startKm: 14.7, periodWeek: false, recentKm: 50 }).baseKm).toBe(35);
+    expect(planVolume({ monday: MON, settings: s, startKm: 14.7, periodWeek: false, recentKm: 10 }).baseKm).toBe(14.7);
+  });
+
+  it('recent weeks: average of the last 2 weeks with data', async () => {
+    const { recentWeeksKm } = await import('./volume');
+    const acts = [walk(addDays(MON, -7), 20), walk(addDays(MON, -14), 10), walk(addDays(MON, -21), 99)];
+    expect(recentWeeksKm(acts, MON, 3)).toBe(15);
+    expect(recentWeeksKm([], MON, 3)).toBeNull();
+  });
+
   it('the period week is light (−25%) without growing; no cycle data → every 4th week', () => {
     const s = { ...base, dailyTargetKm: 5 };
     const v = planVolume({ monday: MON, settings: s, startKm: 20, periodWeek: true });

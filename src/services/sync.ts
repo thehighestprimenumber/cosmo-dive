@@ -39,7 +39,7 @@ import type { WeatherSource } from './weather';
 import { weatherSuggestions, type DayForecast, type WeatherSuggestion } from '../domain/weather';
 import { hardestIn, sessionToRate } from '../domain/effort';
 import { STRENGTH_XP, strengthDaysIn } from '../domain/strength';
-import { planVolume, rebalancedDayKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
+import { planVolume, rebalancedDayKm, recentWeeksKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
 import { generateKeySession } from '../domain/sessions';
 import { withCoachFactor } from '../domain/coach';
 import { coachRestNotes, recoveryAfter } from '../domain/recovery';
@@ -277,6 +277,7 @@ export async function refresh(
       prev,
       periodWeek: cycle ? isPeriodWeek(monday, cycle) : null,
       lastWeekHardest: hardestIn(feelings, addDays(monday, -7)),
+      recentKm: recentWeeksKm(activities, monday, rf),
     });
     return { ...v, v: PLAN_VERSION, ...(provisional ? { provisional: true } : {}) };
   };

@@ -2,6 +2,16 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-23: the plan catches up with what you actually walk
+
+The owner: "goals are very low, 2+ km is too little". This week was planned at 15.3 km after a 23.2 km week: the plan started from a 14.7 km "typical week" and grew only ~4% a week (just enough to reach the trek in June), never looking at what was actually walked.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Catch-up | Each week's base is at least the average of the last 2 weeks with data (never above the destination), then the usual growth applies | Safe by definition: you already walked it. `planVolume` / `recentWeeksKm` in `src/domain/volume.ts` |
+| Doing less | Unchanged: holding or easing off still follows last week vs. its plan | |
+| Rules version | `PLAN_VERSION` 11: this week's km are recomputed and today's goal is redone unless done | |
+
 ## 2026-11-22: active minutes from all-day heart rate
 
 The owner asked for Samsung's "move minutes". Health Connect doesn't share Samsung's raised-HR or active time (its newer activity-intensity type isn't in our library, and it's unclear whether Samsung writes it).
