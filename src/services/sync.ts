@@ -470,7 +470,13 @@ export async function refresh(
           const planNotes = [
             `This week: ${volume.km} km (${Math.round(doneKm * 10) / 10} done so far). Today’s share: ${shareKm} km.`,
             ...(workDay ? ['Work day (from your calendar): a lighter goal; the other days make up for it.'] : []),
-            ...(coachLight ? [`Lighter today (${Math.round(coachLight.factor * 100)}% of the share), agreed with the coach: ${coachLight.reason}`] : []),
+            ...(coachLight
+              ? [
+                  coachLight.factor < 1
+                    ? `Lighter today (${Math.round(coachLight.factor * 100)}% of the share), agreed with the coach: ${coachLight.reason}`
+                    : `Easy day (zone 2), agreed with the coach: ${coachLight.reason}`,
+                ]
+              : []),
             ...volume.notes,
           ];
           const yesterday = addDays(date, -1);
@@ -488,7 +494,8 @@ export async function refresh(
               date === today && coachRest
                 ? coachRestNotes(coachRest.reason)
                 : recoveryAfter(weekKm(activities, yesterday, rf, yesterday), split.regularDayKm),
-            light: !!volume.light,
+            // A day the coach adjusted with you is an easy one (zone 2, no boss).
+            light: !!volume.light || !!coachLight,
             aerobic: isAerobicPhase(date, settings.event),
           });
         }

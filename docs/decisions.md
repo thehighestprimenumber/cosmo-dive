@@ -2,6 +2,13 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-23: the coach records your period; coach-adjusted days are easy
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Period | New chat proposal "Period started today / Mon: light week": records the start like the Week tab button, so the week becomes the light one (25% less, zone 2, no pace push). Undo removes it | The owner told the coach about her period; it could only cut 10% and pointed to Settings |
+| Easy day | Any goal change the coach makes for today is an easy day: heart-rate goals in zone 2, no boss | It suggested "chatting pace" and the goal came out as 51 min in zone 3 (odd weeks use zone 3) |
+
 ## 2026-11-23: short and easy when you ask for it
 
 The owner asked the coach for "a short, slow walk" on a work day and got "Move for 1 h 56 min".

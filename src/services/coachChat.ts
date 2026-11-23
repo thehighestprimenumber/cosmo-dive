@@ -27,7 +27,8 @@ The app's rules already make a sound plan: weekly km grow at most 10% a week tow
 
 Changes you can propose (at most ${MAX_CHAT_PROPOSALS} per answer, only when they help; often none):
 - rest_today: today becomes a rest day that doesn't use one of their weekly rest days (and today's key session moves on). For pain, illness, exhaustion, or a day with no room at all.
-- today_kind: switch today's goal to distance, duration or hr_zone (kind), and/or make it lighter with factor (0.3–1 of today's share; e.g. 0.4 when they ask for something short and easy). Use the factor whenever they ask for less, not only a different type.
+- today_kind: switch today's goal to distance, duration or hr_zone (kind), and/or make it lighter with factor (0.3–1 of today's share; e.g. 0.4 when they ask for something short and easy). Use the factor whenever they ask for less, not only a different type. A day you adjust is always an easy one: heart-rate goals become zone 2.
+- period_started: their period started on a day (to = YYYY-MM-DD, today or up to 10 days ago). Records it like the Week tab's "My period started today": the week with most of it becomes the light week (25% less, zone 2, no pace push). Propose it whenever they mention their period started and it isn't recorded; prefer it over scale_week for that.
 - move_session: move a key session (session id, week = its Monday) to a free day of that week.
 - scale_week: change a week's km by a factor (week = its Monday). This week: only lighter. Next week (exists from Sunday evening): lighter, or slightly more if they're clearly ahead.
 The app checks every proposal, may cap it, and the walker decides with a tap. Never say a change is done: say you're proposing it. Don't promise anything else (you can't change goals directly, rest-day counts, the aim or the trek goal; suggest they do it in Settings or the Week tab if needed).
@@ -37,7 +38,7 @@ The app's strength & mobility routine (10 minutes, twice a week): ${STRENGTH_ROU
 Write in Rioplatense Spanish (voseo), warm and direct, gender-neutral (avoid gendered adjectives). Be brief and concrete, with days and km from the data. No diagnosis: for pain that is sharp, lasting, or with swelling, suggest stopping and seeing a professional. If they just chat, just chat.`;
 
 /** What the rules check proposals against, from the latest sync. */
-function checkContext(snap: Snapshot): ChatCheckContext {
+function checkContext(snap: Snapshot, settings: Settings): ChatCheckContext {
   return {
     today: snap.today,
     todayDone: !!snap.todayProgress?.done,
@@ -46,6 +47,7 @@ function checkContext(snap: Snapshot): ChatCheckContext {
     plan: snap.plan,
     nextPlan: snap.nextPlan,
     doneKm: snap.week.doneKm,
+    periodStarts: settings.periodStarts,
   };
 }
 
@@ -113,7 +115,7 @@ export async function sendChat(
       { role: 'user' as const, content: `Current data (JSON):\n${JSON.stringify(context)}\n\nMessage:\n${user.text}` },
     ];
     const { json } = await askClaude({ apiKey, system: SYSTEM, schema: CHAT_SCHEMA as unknown as Record<string, unknown>, messages, fetchImpl, db, purpose: 'chat' });
-    answer = chatReplyFrom(json, checkContext(snap), newId(t + 1), Math.max(Date.now(), t + 1));
+    answer = chatReplyFrom(json, checkContext(snap, settings), newId(t + 1), Math.max(Date.now(), t + 1));
   } catch (e) {
     answer = { id: newId(t + 1), role: 'assistant', text: await coachErrorMessage(e), proposals: [], at: Math.max(Date.now(), t + 1), error: true };
   }
@@ -148,7 +150,11 @@ export async function decideChatProposal(
 
   if (to === 'applied' || p.status === 'applied') {
     const undo = to !== 'applied';
-    if (a.type === 'rest_today' || a.type === 'today_kind') {
+    if (a.type === 'period_started') {
+      const starts = settings.periodStarts.filter((d) => d !== a.date);
+      result.settingsPatch = { periodStarts: undo ? starts : [...starts, a.date].sort().slice(-24) };
+      result.refresh = { regenerateToday: true };
+    } else if (a.type === 'rest_today' || a.type === 'today_kind') {
       if (a.date !== today) return { message, error: 'That was for another day.' };
       if (todayDone) return { message, error: 'Today’s goal is already done.' };
       if (a.type === 'rest_today') {
@@ -161,7 +167,8 @@ export async function decideChatProposal(
       } else {
         // Another goal type and/or a lighter goal; it also ends a coach rest day.
         result.settingsPatch = {
-          coachToday: a.factor ? { date: today, factor: a.factor, reason: p.reason } : null,
+          // Stored even at full size: a day the coach adjusted is an easy one (zone 2).
+          coachToday: { date: today, factor: a.factor ?? 1, reason: p.reason },
           ...(settings.coachRestDay?.date === today ? { coachRestDay: null } : {}),
         };
         result.refresh = { regenerateToday: true, ...(a.kind ? { todayKind: a.kind } : {}) };
@@ -248,7 +255,7 @@ export async function runDailyCheckin(
     });
     if ((json as { worth_sending?: unknown })?.worth_sending === false) return null;
     const t = now.getTime();
-    const m = chatReplyFrom(json, checkContext(snap), newId(t), t);
+    const m = chatReplyFrom(json, checkContext(snap, settings), newId(t), t);
     if (m.role !== 'assistant') return null;
     const message = { ...m, checkin: true };
     await saveChatMessage(db, message);

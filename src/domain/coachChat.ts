@@ -14,6 +14,8 @@ import { MIN_FACTOR } from './coach';
 export type ChatAction =
   | { type: 'move_session'; week: DateKey; sessionId: string; to: DateKey }
   | { type: 'scale_week'; week: DateKey; factor: number }
+  /** Your period started on this day (records it, like "My period started today": the light week follows). */
+  | { type: 'period_started'; date: DateKey }
   /** Today becomes a rest day agreed with the coach (doesn't use a rest day). */
   | { type: 'rest_today'; date: DateKey }
   /**
@@ -175,12 +177,21 @@ export type ChatCheckContext = {
   nextPlan: WeekPlan | null;
   /** Km walked this week so far (caps how much harder next week may get). */
   doneKm: number;
+  /** Period starts already recorded ("started today" taps). */
+  periodStarts?: DateKey[];
 };
 
 export type ChatChecked = { ok: true; action: ChatAction; change: string; adjusted?: string } | { ok: false; why: string };
 
 export function checkChatAction(a: ChatAction, c: ChatCheckContext): ChatChecked {
   switch (a.type) {
+    case 'period_started': {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date) || a.date > c.today || daysBetween(a.date, c.today) > 10) {
+        return { ok: false, why: 'only a day in the last 10' };
+      }
+      if ((c.periodStarts ?? []).some((d) => Math.abs(daysBetween(d, a.date)) <= 3)) return { ok: false, why: 'already recorded' };
+      return { ok: true, action: a, change: `Period started ${a.date === c.today ? 'today' : weekdayOf(a.date)}: light week` };
+    }
     case 'rest_today':
       if (a.date !== c.today) return { ok: false, why: 'only today' };
       if (c.todayDone) return { ok: false, why: 'today is already done' };
@@ -256,10 +267,10 @@ export const CHAT_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          type: { type: 'string', enum: ['move_session', 'scale_week', 'rest_today', 'today_kind'] },
+          type: { type: 'string', enum: ['move_session', 'scale_week', 'rest_today', 'today_kind', 'period_started'] },
           week: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'move_session / scale_week: the Monday of the week (YYYY-MM-DD).' },
           session_id: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-          to: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'move_session: a free day, YYYY-MM-DD.' },
+          to: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'move_session: a free day, YYYY-MM-DD. period_started: the day it started, YYYY-MM-DD.' },
           factor: {
             anyOf: [{ type: 'number' }, { type: 'null' }],
             description: 'scale_week: e.g. 0.85 for 15% fewer km. today_kind: optional, today’s share × factor (0.3–1), e.g. 0.4 for a short easy day.',
@@ -300,6 +311,7 @@ export function chatReplyFrom(raw: unknown, c: ChatCheckContext, id: string, at:
     if (!reason) continue;
     let action: ChatAction | null = null;
     if (p.type === 'rest_today') action = { type: 'rest_today', date: c.today };
+    else if (p.type === 'period_started') action = { type: 'period_started', date: str(p.to) ?? c.today };
     else if (p.type === 'today_kind' && (str(p.kind) || typeof p.factor === 'number')) {
       action = {
         type: 'today_kind',

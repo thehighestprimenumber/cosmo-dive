@@ -51,6 +51,13 @@ describe('chat proposals', () => {
     expect(checkChatAction({ type: 'today_kind', date: WED, kind: null }, ctx).ok).toBe(false);
   });
 
+  it('records a period start (today or the last 10 days), once', () => {
+    expect(checkChatAction({ type: 'period_started', date: WED }, ctx)).toMatchObject({ ok: true, change: 'Period started today: light week' });
+    expect(checkChatAction({ type: 'period_started', date: MONDAY }, ctx)).toMatchObject({ ok: true, change: 'Period started Mon: light week' });
+    expect(checkChatAction({ type: 'period_started', date: addDays(WED, 1) }, ctx).ok).toBe(false); // future
+    expect(checkChatAction({ type: 'period_started', date: WED }, { ...ctx, periodStarts: [addDays(WED, -2)] }).ok).toBe(false);
+  });
+
   it('moves this week’s sessions only to free days from today on, never a past session', () => {
     expect(checkChatAction({ type: 'move_session', week: MONDAY, sessionId: 'long', to: addDays(MONDAY, 6) }, ctx)).toMatchObject({
       ok: true,

@@ -146,4 +146,22 @@ describe('coach chat', () => {
     const quiet = claudeSays({ reply: '-', proposals: [], worth_sending: false });
     expect(await runDailyCheckin(db, snap, base, at(WED, 9), quiet.f)).toBeNull();
   });
+
+  it('a heart-rate goal the coach sets is an easy one: zone 2', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    let settings = { ...base };
+    const snap = await refresh(db, source, settings, { now: at(WED, 8) });
+    const { f } = claudeSays({
+      reply: 'Tranqui hoy.',
+      proposals: [{ type: 'today_kind', week: null, session_id: null, to: null, factor: null, kind: 'hr_zone', reason: 'Ritmo de charla.' }],
+    });
+    const [, answer] = await sendChat(db, 'Algo suave', snap, settings, at(WED, 8), f);
+    if (answer.role !== 'assistant') throw new Error();
+    const d = await decideChatProposal(db, answer, answer.proposals[0].id, 'applied', snap, settings);
+    settings = { ...settings, ...d.settingsPatch };
+    const after = await refresh(db, source, settings, { now: at(WED, 9), ...d.refresh });
+    expect(after.todayGoal).toMatchObject({ kind: 'hr_zone', zone: 2 });
+    expect(after.todayNotes.join(' ')).toContain('Easy day (zone 2), agreed with the coach');
+  });
 });
