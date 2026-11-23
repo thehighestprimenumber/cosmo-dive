@@ -9,6 +9,7 @@ import {
   readRecords,
   requestPermission,
 } from 'react-native-health-connect';
+import { readMoveMinutes } from '../../modules/health-extra';
 import { toDateKey } from '../domain/dates';
 import { dedupeActivities } from '../domain/progress';
 import { periodsFromDays, type Period } from '../domain/cycle';
@@ -133,6 +134,10 @@ export const healthConnectSource: ActivitySource = {
     const flows = await readAll('MenstruationFlow', from, to).catch(() => []);
     const flowDays = flows.map((r) => toDateKey(new Date((r as unknown as { time: string }).time)));
     return [...periods, ...periodsFromDays(flowDays)];
+  },
+
+  async getMoveMinutes(from: Date, to: Date): Promise<{ start: number; end: number }[]> {
+    return readMoveMinutes(from, to);
   },
 
   async getHeartRate(from: Date, to: Date): Promise<HrSample[]> {

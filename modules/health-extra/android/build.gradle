@@ -1,0 +1,24 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.dailyspark'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.healthextra"
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+}
+
+dependencies {
+  implementation 'com.facebook.react:react-android'
+  // Activity intensity (move minutes) needs a recent Health Connect client; the code reaches the
+  // record type by reflection, so it also builds (and reports "unsupported") with an older one.
+  implementation 'androidx.health.connect:connect-client:+'
+  implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+  implementation 'androidx.activity:activity:1.9.3'
+}

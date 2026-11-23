@@ -2,6 +2,18 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-23: move minutes from Google Fit (via Health Connect)
+
+Samsung Health has write permission but writes nothing to Health Connect on the owner's phone; Google Fit writes exercise, distance and **activity intensity** (moderate/vigorous minutes, its "move minutes").
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Source | Health Connect's activity-intensity records, from any app (Google Fit here). Not the Google Fit API directly: it's being shut down, and Fit already shares through Health Connect | |
+| Native | New local Expo module `modules/health-extra` (react-native-health-connect doesn't know this record type). It reads the type by reflection, so it builds with any Health Connect client and reports "unsupported" if the installed one lacks it; depends on the latest `connect-client` | |
+| Permission | `READ_ACTIVITY_INTENSITY` declared in the manifest; Settings → Move minutes → "Allow move minutes" shows Health Connect's prompt | |
+| How it counts | Moderate and vigorous intervals outside recorded workouts, overlaps once; per day the larger of move minutes and raised-heart-rate minutes counts for time goals | `intensitySeconds` / `combineActive` |
+| Diagnostics | "Move minutes today" line in 🐞 | |
+
 ## 2026-11-23: the coach records your period; coach-adjusted days are easy
 
 | Topic | Decision | Why / how to change |

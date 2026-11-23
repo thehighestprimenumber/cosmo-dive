@@ -11,6 +11,7 @@ import { formatTime, nudgeTime } from '../../domain/habits';
 import { useApp } from '../../state/AppState';
 import type { Settings } from '../../domain/types';
 import { deleteApiKey, getApiKey, setApiKey } from '../../services/coach';
+import { moveMinutesStatus, requestMoveMinutes, type IntensityStatus } from '../../../modules/health-extra';
 import { hasCalendarAccess, listCalendars, requestCalendarAccess } from '../../services/calendar';
 import { findPlaces, type Place } from '../../services/weather';
 import { chooseBackupFolder, runAutoBackup } from '../../services/autoBackup';
@@ -140,6 +141,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
           </Text>
           <Button title="Save" onPress={save} />
         </Card>
+
+        <MoveMinutes />
 
         <WorkShifts settings={settings} />
 
@@ -442,5 +445,39 @@ function AutoBackup({ settings }: { settings: Settings }) {
         <Button title="Choose a folder" variant="secondary" onPress={choose} disabled={busy} />
       )}
     </View>
+  );
+}
+
+/** Move minutes (Health Connect activity intensity, e.g. from Google Fit) for time goals. */
+function MoveMinutes() {
+  const { refresh } = useApp();
+  const [status, setStatus] = useState<IntensityStatus | null>(null);
+  useEffect(() => {
+    let live = true;
+    moveMinutesStatus().then((s) => live && setStatus(s));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const allow = async () => {
+    const ok = await requestMoveMinutes();
+    setStatus(ok ? 'granted' : await moveMinutesStatus());
+    if (ok) await refresh({ regenerateToday: false });
+  };
+  return (
+    <Card>
+      <Label>⏱️ Move minutes</Label>
+      <Text style={[styles.muted, { marginBottom: 8 }]}>
+        Minutes of moderate or vigorous activity that another app (e.g. Google Fit) shares with Health Connect. They
+        count for time goals, together with recorded workouts; without them, time with a raised heart rate counts.
+      </Text>
+      {status === 'granted' ? (
+        <Text style={styles.body}>✓ Reading move minutes</Text>
+      ) : status === 'denied' ? (
+        <Button title="Allow move minutes" variant="secondary" onPress={allow} />
+      ) : status === 'unsupported' ? (
+        <Text style={styles.hint}>This version of the app can’t read move minutes yet.</Text>
+      ) : null}
+    </Card>
   );
 }

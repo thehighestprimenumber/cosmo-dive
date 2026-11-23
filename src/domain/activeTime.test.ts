@@ -43,4 +43,17 @@ describe('active minutes from all-day heart rate', () => {
     // Without heart rate for the day: the estimate.
     expect(measure({ kind: 'duration', seconds: 1200 }, withAllDayWalking([], { [DAY]: 2040 }, 0.72), settings)).toBe(1469);
   });
+
+  it('move minutes (activity intensity): overlaps once, outside workouts; the larger of move and heart rate', async () => {
+    const { intensitySeconds, combineActive } = await import('./activeTime');
+    const iv = [
+      { start: at(9, 0), end: at(9, 10) },
+      { start: at(9, 5), end: at(9, 15) }, // overlaps the first: 15 min in all
+      { start: at(18, 59), end: at(19, 0) },
+    ];
+    const workout: Activity = { id: 'w', sport: 'walk', start: at(9, 10), end: at(9, 15), durationS: 300, distanceM: 400, hr: [], origin: 't' };
+    expect(intensitySeconds(iv, [])).toEqual({ [DAY]: 16 * 60 });
+    expect(intensitySeconds(iv, [workout])).toEqual({ [DAY]: 11 * 60 });
+    expect(combineActive({ [DAY]: 600 }, { [DAY]: 900, '2026-11-21': 300 })).toEqual({ [DAY]: 900, '2026-11-21': 300 });
+  });
 });

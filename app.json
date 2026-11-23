@@ -25,7 +25,8 @@
         "android.permission.health.READ_SLEEP",
         "android.permission.health.READ_MENSTRUATION",
         "android.permission.health.READ_ELEVATION_GAINED",
-        "android.permission.VIBRATE"
+        "android.permission.VIBRATE",
+        "android.permission.health.READ_ACTIVITY_INTENSITY"
       ],
       "predictiveBackGestureEnabled": false,
       "versionCode": 1,

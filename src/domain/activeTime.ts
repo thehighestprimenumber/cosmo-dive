@@ -39,3 +39,33 @@ export function raisedSeconds(samples: HrSample[], minBpm: number, workouts: Act
   for (const d of Object.keys(out)) out[d] = Math.round(out[d]);
   return out;
 }
+
+/**
+ * Seconds of moderate or vigorous activity per day (Health Connect "activity
+ * intensity", e.g. Google Fit's move minutes), outside recorded workouts.
+ * Overlapping intervals count once.
+ */
+export function intensitySeconds(intervals: { start: number; end: number }[], workouts: Activity[]): Record<DateKey, number> {
+  const out: Record<DateKey, number> = {};
+  const busy = workouts.filter((w) => !w.synthetic).map((w) => [w.start, w.end] as const);
+  const sorted = [...intervals].filter((i) => i.end > i.start).sort((a, b) => a.start - b.start);
+  let coveredUntil = -Infinity;
+  for (const iv of sorted) {
+    const start = Math.max(iv.start, coveredUntil);
+    if (iv.end <= start) continue;
+    coveredUntil = iv.end;
+    let ms = iv.end - start;
+    for (const [ws, we] of busy) ms -= Math.max(0, Math.min(iv.end, we) - Math.max(start, ws));
+    const d = toDateKey(iv.start);
+    out[d] = (out[d] ?? 0) + Math.max(0, ms) / 1000;
+  }
+  for (const d of Object.keys(out)) out[d] = Math.round(out[d]);
+  return out;
+}
+
+/** Per day: move minutes when known, else raised heart rate (the larger if both). */
+export function combineActive(move: Record<DateKey, number>, hr: Record<DateKey, number>): Record<DateKey, number> {
+  const out: Record<DateKey, number> = { ...hr };
+  for (const [d, s] of Object.entries(move)) out[d] = Math.max(s, hr[d] ?? 0);
+  return out;
+}

@@ -14,7 +14,7 @@ import {
 } from '../data/db';
 import { isAerobicPhase, WEEKLY_ZONE2_SHARE, zone2Minutes } from '../domain/aerobic';
 import { withAllDayWalking } from '../domain/allday';
-import { ACTIVE_TIME_DAYS, raisedBpm, raisedSeconds } from '../domain/activeTime';
+import { ACTIVE_TIME_DAYS, combineActive, intensitySeconds, raisedBpm, raisedSeconds } from '../domain/activeTime';
 import { cycleInfo, isPeriodWeek, nextPeriod, type Period } from '../domain/cycle';
 import { hasElevationData, longWalkClimb, typicalClimbPerKm } from '../domain/elevation';
 import {
@@ -95,7 +95,14 @@ export type Snapshot = {
   /** A key session done today or yesterday, waiting for "how did it feel?". */
   toRate: { date: DateKey; kind: SessionKind } | null;
   /** Active minutes from all-day heart rate today (for Diagnostics): threshold, minutes, readings. */
-  activeTime: { thresholdBpm: number; todayS: number | null; readingsToday: number; medianGapS: number | null };
+  activeTime: {
+    thresholdBpm: number;
+    todayS: number | null;
+    readingsToday: number;
+    medianGapS: number | null;
+    /** Move minutes today from Health Connect activity intensity (null: none shared). */
+    moveTodayS: number | null;
+  };
   /** Work days from your calendar, this week and next. */
   busyDays: DateKey[];
   /** Key sessions this sync moved off a work day. */
@@ -237,7 +244,13 @@ export async function refresh(
   const allDayHr = source.getHeartRate
     ? await source.getHeartRate(startOfDay(hrFrom), endOfDay(today)).catch(() => [])
     : [];
-  const activeSeconds = raisedSeconds(allDayHr, raisedBpm(settings.maxHr), sessions);
+  const hrActive = raisedSeconds(allDayHr, raisedBpm(settings.maxHr), sessions);
+  // Move minutes (Health Connect activity intensity, e.g. Google Fit), when shared.
+  const moveIntervals = source.getMoveMinutes
+    ? await source.getMoveMinutes(startOfDay(hrFrom), endOfDay(today)).catch(() => [])
+    : [];
+  const moveActive = intensitySeconds(moveIntervals, sessions);
+  const activeSeconds = combineActive(moveActive, hrActive);
   const activities = withAllDayWalking(sessions, dailyDistance, walkingPace(sessions) ?? undefined, activeSeconds);
 
   // How hard key sessions felt (your ratings), and strength sessions ticked off.
@@ -592,7 +605,8 @@ export async function refresh(
       const gaps = todays.slice(1).map((x, i) => (x.t - todays[i].t) / 1000).sort((a, b) => a - b);
       return {
         thresholdBpm: raisedBpm(settings.maxHr),
-        todayS: activeSeconds[today] ?? null,
+        todayS: hrActive[today] ?? null,
+        moveTodayS: moveActive[today] ?? null,
         readingsToday: todays.length,
         medianGapS: gaps.length ? Math.round(gaps[Math.floor(gaps.length / 2)]) : null,
       };

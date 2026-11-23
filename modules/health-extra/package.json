@@ -1,0 +1,7 @@
+{
+  "name": "health-extra",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reads Health Connect data types the react-native-health-connect library doesn't cover yet (activity intensity: move minutes).",
+  "main": "index.ts"
+}

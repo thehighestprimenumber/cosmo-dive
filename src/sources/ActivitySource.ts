@@ -22,6 +22,8 @@ export interface ActivitySource {
   getDailyDistance?(from: Date, to: Date): Promise<Record<string, number>>;
   /** All-day heart rate readings in [from, to). Optional; gives active minutes outside workouts. */
   getHeartRate?(from: Date, to: Date): Promise<HrSample[]>;
+  /** Moderate/vigorous activity intervals (move minutes) in [from, to). Optional. */
+  getMoveMinutes?(from: Date, to: Date): Promise<{ start: number; end: number }[]>;
   /** Nights of sleep whose wake-up date falls in [from, to). Optional; used for readiness. */
   getNights?(from: Date, to: Date): Promise<Night[]>;
   /** Whether sleep can be read (separate, optional permission). */

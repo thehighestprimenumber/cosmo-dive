@@ -40,9 +40,10 @@ export function CoachDebug({ refreshKey = 0 }: { refreshKey?: number }) {
     at
       ? `Active today (heart rate ≥ ${at.thresholdBpm} bpm, outside workouts): ${at.todayS == null ? 'no readings' : `${Math.round(at.todayS / 60)} min`} · ${at.readingsToday} readings${at.medianGapS != null ? `, every ~${at.medianGapS} s` : ''}`
       : 'Active today: not synced yet',
+    at ? `Move minutes today (Health Connect activity intensity): ${at.moveTodayS == null ? 'none shared' : `${Math.round(at.moveTodayS / 60)} min`}` : '',
     `API key: ${key ? `saved (…${key.slice(-4)})` : 'none'}`,
     `Coach ${settings?.coachEnabled ? 'on' : 'off'} · check-in ${settings?.dailyCheckin ? 'on' : 'off'} (last ${settings?.lastCheckin ?? 'never'}) · share cycle ${settings?.coachShareCycle ? 'on' : 'off'}`,
-  ];
+  ].filter(Boolean);
 
   return (
     <View style={{ backgroundColor: colors.bg, borderRadius: 12, borderWidth: 1, borderColor: colors.cardBorder, padding: 10, marginBottom: 12 }}>
