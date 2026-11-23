@@ -154,7 +154,7 @@ export default function CoachScreen() {
                     adjusted={p.adjusted}
                     status={p.status}
                     busy={busy || isStale(p.action, snapshot?.today)}
-                    canUndo={p.action.type !== 'today_kind'}
+                    canUndo
                     onDecide={(to) => decide(m, p.id, to)}
                   />
                 ))}

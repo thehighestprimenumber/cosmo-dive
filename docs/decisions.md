@@ -2,6 +2,17 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-23: short and easy when you ask for it
+
+The owner asked the coach for "a short, slow walk" on a work day and got "Move for 1 h 56 min".
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Walking pace | Kept within 9–14 min/km | Recorded walks (Google Fit here) include stops: 2 h 30 for 7.7 km gave 18:40 min/km, so 6.2 km became almost 2 hours. `walkingPace` in `src/domain/aim.ts` |
+| Lighter today | The coach's "today's goal" proposal can also make today lighter: today's share × 0.3–1 ("Today's goal: Time, 60% lighter"), with or without another type. Stored as `settings.coachToday`; undo brings the plan's goal back | Before, it could only switch the type, keeping the full share |
+| Picked type | A goal type you picked for today survives today's goal being redone (new rules, sleep, coach) | |
+| Rules version | `PLAN_VERSION` 12 | |
+
 ## 2026-11-23: the plan catches up with what you actually walk
 
 The owner: "goals are very low, 2+ km is too little". This week was planned at 15.3 km after a 23.2 km week: the plan started from a 14.7 km "typical week" and grew only ~4% a week (just enough to reach the trek in June), never looking at what was actually walked.

@@ -39,6 +39,18 @@ describe('chat proposals', () => {
     expect(checkChatAction({ type: 'today_kind', date: WED, kind: 'distance' }, ctx).ok).toBe(false); // already
   });
 
+  it('a lighter goal today: factor 0.3–1, with or without another type', () => {
+    expect(checkChatAction({ type: 'today_kind', date: WED, kind: 'duration', factor: 0.4 }, ctx)).toMatchObject({
+      ok: true,
+      change: 'Today’s goal: Time, 60% lighter',
+      action: { kind: 'duration', factor: 0.4 },
+    });
+    expect(checkChatAction({ type: 'today_kind', date: WED, kind: null, factor: 0.5 }, ctx)).toMatchObject({ ok: true, change: 'Today’s goal: 50% lighter' });
+    const floor = checkChatAction({ type: 'today_kind', date: WED, kind: null, factor: 0.1 }, ctx);
+    expect(floor).toMatchObject({ ok: true, action: { factor: 0.3 } });
+    expect(checkChatAction({ type: 'today_kind', date: WED, kind: null }, ctx).ok).toBe(false);
+  });
+
   it('moves this week’s sessions only to free days from today on, never a past session', () => {
     expect(checkChatAction({ type: 'move_session', week: MONDAY, sessionId: 'long', to: addDays(MONDAY, 6) }, ctx)).toMatchObject({
       ok: true,

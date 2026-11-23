@@ -25,7 +25,7 @@ import type {
  * that created them, so old history never gets silently reinterpreted, and
  * goals from older versions are never used as a starting point.
  */
-export const PLAN_VERSION = 11;
+export const PLAN_VERSION = 12;
 
 /** How far back "your typical day" looks. */
 export const LOOKBACK_DAYS = 90;

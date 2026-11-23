@@ -209,6 +209,12 @@ export async function refresh(
       : [];
   const sleepArrived = waitingForSleep && nights.some((n) => n.date === today);
 
+  // A goal type you picked for today survives today's goal being redone (new rules, sleep, coach).
+  const pickedToday =
+    todays?.goal && ['distance', 'duration', 'hr_zone'].includes(todays.goal.kind) &&
+    todays.meta?.notes.includes('You picked this goal type for today.')
+      ? (todays.goal.kind as RegularKind)
+      : undefined;
   const mayReplaceToday =
     !!todays && (opts.regenerateToday || todays.planVersion < PLAN_VERSION || sleepArrived);
 
@@ -423,7 +429,7 @@ export async function refresh(
       const streakSoFar = computeStreak(history, date, settings.restDaysPerWeek);
       const statuses = streakSoFar.statuses;
       const readiness = source.getNights ? readinessFor(date, nights) : undefined;
-      const kind = date === today ? opts.todayKind : undefined;
+      const kind = date === today ? (opts.todayKind ?? pickedToday) : undefined;
       const dayPlan = date >= thisMonday ? plan : await loadWeekPlan(db, mondayOf(date));
       const key = sessionOn(dayPlan, date);
       const volume = dayPlan?.volume;
@@ -458,10 +464,13 @@ export async function refresh(
             restLeft: streakSoFar.restLeftThisWeek,
           });
           const workDay = busy.includes(date);
-          const shareKm = workDay ? Math.round(dayKm * WORK_DAY * 10) / 10 : dayKm;
+          const coachLight = date === today && settings.coachToday?.date === today ? settings.coachToday : null;
+          const shareKm =
+            Math.round(dayKm * (workDay ? WORK_DAY : 1) * (coachLight ? coachLight.factor : 1) * 10) / 10;
           const planNotes = [
             `This week: ${volume.km} km (${Math.round(doneKm * 10) / 10} done so far). Today’s share: ${shareKm} km.`,
             ...(workDay ? ['Work day (from your calendar): a lighter goal; the other days make up for it.'] : []),
+            ...(coachLight ? [`Lighter today (${Math.round(coachLight.factor * 100)}% of the share), agreed with the coach: ${coachLight.reason}`] : []),
             ...volume.notes,
           ];
           const yesterday = addDays(date, -1);

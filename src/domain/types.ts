@@ -156,6 +156,8 @@ export type Settings = {
   coachShareCycle: boolean;
   /** A rest day agreed with the coach in the chat (today only). */
   coachRestDay: { date: DateKey; reason: string } | null;
+  /** A lighter goal for today agreed with the coach (today's share × factor). */
+  coachToday: { date: DateKey; factor: number; reason: string } | null;
   /** The coach checks in on mornings when something stands out (with the coach on). */
   dailyCheckin: boolean;
   /** Last day the morning check-in was considered (so it runs once a day). */
@@ -195,6 +197,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   coachEnabled: false,
   coachShareCycle: false,
   coachRestDay: null,
+  coachToday: null,
   dailyCheckin: true,
   lastCheckin: null,
   workCalendars: [],

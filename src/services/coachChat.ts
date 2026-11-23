@@ -27,7 +27,7 @@ The app's rules already make a sound plan: weekly km grow at most 10% a week tow
 
 Changes you can propose (at most ${MAX_CHAT_PROPOSALS} per answer, only when they help; often none):
 - rest_today: today becomes a rest day that doesn't use one of their weekly rest days (and today's key session moves on). For pain, illness, exhaustion, or a day with no room at all.
-- today_kind: switch today's goal to distance, duration or hr_zone (e.g. time instead of km when they'll kayak, or a short hr_zone goal on a tired day).
+- today_kind: switch today's goal to distance, duration or hr_zone (kind), and/or make it lighter with factor (0.3–1 of today's share; e.g. 0.4 when they ask for something short and easy). Use the factor whenever they ask for less, not only a different type.
 - move_session: move a key session (session id, week = its Monday) to a free day of that week.
 - scale_week: change a week's km by a factor (week = its Monday). This week: only lighter. Next week (exists from Sunday evening): lighter, or slightly more if they're clearly ahead.
 The app checks every proposal, may cap it, and the walker decides with a tap. Never say a change is done: say you're proposing it. Don't promise anything else (you can't change goals directly, rest-day counts, the aim or the trek goal; suggest they do it in Settings or the Week tab if needed).
@@ -155,11 +155,16 @@ export async function decideChatProposal(
         result.settingsPatch = { coachRestDay: undo ? null : { date: today, reason: p.reason } };
         result.refresh = { regenerateToday: true };
       } else if (undo) {
-        return { message, error: 'To change it back, pick a goal type on the Today screen.' };
+        // Back to the plan's goal for today.
+        result.settingsPatch = { coachToday: null };
+        result.refresh = { regenerateToday: true };
       } else {
-        // Choosing a goal type also ends a coach rest day.
-        if (settings.coachRestDay?.date === today) result.settingsPatch = { coachRestDay: null };
-        result.refresh = { regenerateToday: true, todayKind: a.kind };
+        // Another goal type and/or a lighter goal; it also ends a coach rest day.
+        result.settingsPatch = {
+          coachToday: a.factor ? { date: today, factor: a.factor, reason: p.reason } : null,
+          ...(settings.coachRestDay?.date === today ? { coachRestDay: null } : {}),
+        };
+        result.refresh = { regenerateToday: true, ...(a.kind ? { todayKind: a.kind } : {}) };
       }
     } else {
       const saved = await loadWeekPlan(db, a.week);

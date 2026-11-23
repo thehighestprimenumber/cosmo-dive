@@ -16,8 +16,11 @@ export type ChatAction =
   | { type: 'scale_week'; week: DateKey; factor: number }
   /** Today becomes a rest day agreed with the coach (doesn't use a rest day). */
   | { type: 'rest_today'; date: DateKey }
-  /** Today's goal becomes another type (as with the chips on Today). */
-  | { type: 'today_kind'; date: DateKey; kind: RegularKind };
+  /**
+   * Today's goal: another type (as with the chips on Today) and/or lighter
+   * (factor 0.3–1, e.g. 0.4 for a short easy day). kind null = same type.
+   */
+  | { type: 'today_kind'; date: DateKey; kind: RegularKind | null; factor?: number };
 
 export type ChatProposal = {
   id: string;
@@ -45,6 +48,8 @@ export type ChatMessage =
 /** Messages sent back to the model (older ones are kept on the phone but not sent). */
 export const CHAT_HISTORY = 20;
 export const MAX_CHAT_PROPOSALS = 2;
+/** The coach can make today's goal as light as 30% of the day's share (less than that: rest today). */
+export const MIN_TODAY_FACTOR = 0.3;
 
 const weekdayOf = (d: DateKey) =>
   ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(d + 'T12:00:00').getDay()];
@@ -181,12 +186,28 @@ export function checkChatAction(a: ChatAction, c: ChatCheckContext): ChatChecked
       if (c.todayDone) return { ok: false, why: 'today is already done' };
       if (c.todayRecovery) return { ok: false, why: 'today is already a rest day' };
       return { ok: true, action: a, change: 'Today: rest day 🛌' };
-    case 'today_kind':
+    case 'today_kind': {
       if (a.date !== c.today) return { ok: false, why: 'only today' };
       if (c.todayDone) return { ok: false, why: 'today is already done' };
-      if (!['distance', 'duration', 'hr_zone'].includes(a.kind)) return { ok: false, why: 'unknown goal type' };
-      if (c.todayGoal?.kind === a.kind && !c.todayRecovery) return { ok: false, why: 'already that type' };
-      return { ok: true, action: a, change: `Today’s goal: ${KIND_LABEL[a.kind]}` };
+      if (a.kind != null && !['distance', 'duration', 'hr_zone'].includes(a.kind)) return { ok: false, why: 'unknown goal type' };
+      const isKey = c.todayGoal?.kind === 'long_walk' || c.todayGoal?.kind === 'brisk_walk';
+      if (a.kind == null && isKey) return { ok: false, why: 'pick a goal type to replace a key session' };
+      const factor = a.factor != null && Number.isFinite(a.factor) ? Math.min(1, Math.max(MIN_TODAY_FACTOR, a.factor)) : null;
+      const lighter = factor != null && factor < 0.97;
+      if (!lighter && (a.kind == null || (c.todayGoal?.kind === a.kind && !c.todayRecovery))) {
+        return { ok: false, why: 'nothing changes' };
+      }
+      const parts = [
+        ...(a.kind ? [KIND_LABEL[a.kind]] : []),
+        ...(lighter ? [`${Math.round((1 - factor!) * 100)}% lighter`] : []),
+      ];
+      return {
+        ok: true,
+        action: { type: 'today_kind', date: a.date, kind: a.kind, ...(lighter ? { factor: Math.round(factor! * 100) / 100 } : {}) },
+        change: `Today’s goal: ${parts.join(', ')}`,
+        ...(lighter && a.factor! < MIN_TODAY_FACTOR ? { adjusted: 'Kept at 30% of today’s share at least: for less, rest today.' } : {}),
+      };
+    }
     case 'move_session': {
       const plan = a.week === c.plan.week ? c.plan : a.week === c.nextPlan?.week ? c.nextPlan : null;
       if (!plan) return { ok: false, why: 'not this week or next' };
@@ -239,7 +260,10 @@ export const CHAT_SCHEMA = {
           week: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'move_session / scale_week: the Monday of the week (YYYY-MM-DD).' },
           session_id: { anyOf: [{ type: 'string' }, { type: 'null' }] },
           to: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'move_session: a free day, YYYY-MM-DD.' },
-          factor: { anyOf: [{ type: 'number' }, { type: 'null' }], description: 'scale_week: e.g. 0.85 for 15% fewer km.' },
+          factor: {
+            anyOf: [{ type: 'number' }, { type: 'null' }],
+            description: 'scale_week: e.g. 0.85 for 15% fewer km. today_kind: optional, today’s share × factor (0.3–1), e.g. 0.4 for a short easy day.',
+          },
           kind: { anyOf: [{ type: 'string', enum: ['distance', 'duration', 'hr_zone'] }, { type: 'null' }] },
           reason: { type: 'string', description: 'Why, in one sentence.' },
         },
@@ -276,7 +300,14 @@ export function chatReplyFrom(raw: unknown, c: ChatCheckContext, id: string, at:
     if (!reason) continue;
     let action: ChatAction | null = null;
     if (p.type === 'rest_today') action = { type: 'rest_today', date: c.today };
-    else if (p.type === 'today_kind' && str(p.kind)) action = { type: 'today_kind', date: c.today, kind: p.kind as RegularKind };
+    else if (p.type === 'today_kind' && (str(p.kind) || typeof p.factor === 'number')) {
+      action = {
+        type: 'today_kind',
+        date: c.today,
+        kind: (str(p.kind) as RegularKind | null) ?? null,
+        ...(typeof p.factor === 'number' ? { factor: p.factor } : {}),
+      };
+    }
     else if (p.type === 'move_session' && str(p.week) && str(p.session_id) && str(p.to)) {
       action = { type: 'move_session', week: p.week as string, sessionId: p.session_id as string, to: p.to as string };
     } else if (p.type === 'scale_week' && str(p.week) && typeof p.factor === 'number') {

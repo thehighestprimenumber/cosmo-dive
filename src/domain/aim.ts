@@ -29,6 +29,10 @@ export function aimPerTrainingDay(
 }
 
 /** Your usual walking pace in seconds per metre: median over walks of 15+ min with a distance. */
+/** Walking pace is kept within 9–14 min/km (seconds per metre). */
+const FASTEST_PACE = 0.54;
+const SLOWEST_PACE = 0.84;
+
 export function walkingPace(activities: Activity[]): number | null {
   const paces = activities
     .filter((a) => a.sport === 'walk' && !a.synthetic && a.durationS >= 15 * 60 && a.distanceM && a.distanceM > 500)
@@ -36,7 +40,9 @@ export function walkingPace(activities: Activity[]): number | null {
     .sort((a, b) => a - b);
   if (paces.length < 3) return null;
   const mid = Math.floor(paces.length / 2);
-  return paces.length % 2 ? paces[mid] : (paces[mid - 1] + paces[mid]) / 2;
+  const median = paces.length % 2 ? paces[mid] : (paces[mid - 1] + paces[mid]) / 2;
+  // Recorded walks often include stops (e.g. 2 h 30 for 7.7 km): keep it to a real walking pace.
+  return Math.min(SLOWEST_PACE, Math.max(FASTEST_PACE, median));
 }
 
 /** Average walk-equivalent km per day over the last `days` days (today included), counting every day. */
