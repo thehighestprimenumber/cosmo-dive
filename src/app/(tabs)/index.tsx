@@ -160,6 +160,7 @@ export default function TodayScreen() {
                 ? `Goal complete! 🎉 ${formatValue(goal, progress.value)}`
                 : `${formatValue(goal, progress.value)} of ${formatValue(goal, progress.target)}`}
             </Text>
+            {goal.kind === 'distance' && <DistanceBreakdown activities={snapshot.todayActivities} rideFactor={settings.rideFactor} />}
             {progress.ascent && (
               <Text style={styles.body}>
                 ⛰️ {Math.round(progress.ascent.value)} of {progress.ascent.target} m climbed (in the same walk)
@@ -431,5 +432,17 @@ function CoachNote({ today, syncedAt }: { today: string; syncedAt: number }) {
         </Text>
       </Card>
     </Pressable>
+  );
+}
+
+/** For distance goals: what was walked and what was ridden (rides count 1/rideFactor). */
+function DistanceBreakdown({ activities, rideFactor }: { activities: Activity[]; rideFactor: number }) {
+  const walkM = activities.filter((a) => a.sport === 'walk').reduce((t, a) => t + (a.distanceM ?? 0), 0);
+  const rideM = activities.filter((a) => a.sport === 'ride').reduce((t, a) => t + (a.distanceM ?? 0), 0);
+  if (rideM < 100) return null;
+  return (
+    <Text style={styles.hint}>
+      {formatKm(walkM)} walked + {formatKm(rideM)} by bike (counts ÷{rideFactor} = {formatKm(rideM / rideFactor)})
+    </Text>
   );
 }
