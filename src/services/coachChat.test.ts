@@ -8,7 +8,7 @@ import { refresh } from './sync';
 
 vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn(async () => 'sk-ant-test'), setItemAsync: vi.fn(), deleteItemAsync: vi.fn() }));
 
-const { decideChatProposal, runDailyCheckin, sendChat } = await import('./coachChat');
+const { decideChatProposal, runCongrats, runDailyCheckin, sendChat } = await import('./coachChat');
 
 const MON = '2026-11-23';
 const WED = addDays(MON, 2);
@@ -27,7 +27,7 @@ const history = [
     .filter((_, i) => i % 7 < 6)
     .map((d) => walk(d, 4)),
   walk(MON, 5),
-  walk(addDays(MON, 1), 5),
+  walk(addDays(MON, 1), 3), // 36 min vs a ~32 min goal: done, not beaten by far
 ];
 const source: ActivitySource = {
   name: 'test',
@@ -145,6 +145,20 @@ describe('coach chat', () => {
     // Nothing worth sending: nothing saved.
     const quiet = claudeSays({ reply: '-', proposals: [], worth_sending: false });
     expect(await runDailyCheckin(db, snap, base, at(WED, 9), quiet.f)).toBeNull();
+  });
+
+  it('goal done: the coach congratulates once, saved in the chat; not before it is done', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const early = await refresh(db, source, base, { now: at(WED, 8) });
+    const { f, bodies } = claudeSays({ reply: '¡Bien ahí! 5 km y racha de 3.', proposals: [], worth_sending: true });
+    expect(await runCongrats(db, early, base, at(WED, 8), f)).toBeNull(); // nothing walked yet today
+    expect(bodies).toHaveLength(0);
+    const done = { ...early, todayProgress: { ...early.todayProgress!, done: true } };
+    const m = await runCongrats(db, done, base, at(WED, 19), f);
+    expect(m).toMatchObject({ role: 'assistant', congrats: true, proposals: [] });
+    expect((bodies[0].messages as { content: string }[]).at(-1)!.content).toContain('just completed');
+    expect((await loadChat(db)).at(-1)).toMatchObject({ congrats: true });
   });
 
   it('a heart-rate goal the coach sets is an easy one: zone 2', async () => {

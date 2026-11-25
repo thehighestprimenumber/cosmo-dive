@@ -8,10 +8,10 @@ import { updateTodayWidget } from '../widget/update';
 import { sendStateToWatch } from '../../modules/wear-sync';
 import { shouldAutoReview } from '../domain/coach';
 import { checkinDue } from '../domain/checkin';
-import { runDailyCheckin } from './coachChat';
+import { runCongrats, runDailyCheckin } from './coachChat';
 import { backupDue, runAutoBackup } from './autoBackup';
 import { getApiKey, runWeeklyReview } from './coach';
-import { notifyAchievements, notifyCheckin, notifyCoachReview, notifyAimReached, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
+import { notifyAchievements, notifyCheckin, notifyCoachNote, notifyCoachReview, notifyAimReached, notifyGoalComplete, updateEvening, updateNudge } from './notifications';
 import type { Snapshot } from './sync';
 
 /**
@@ -85,6 +85,13 @@ export async function afterSync(
   if (lastCelebrated === snap.today) return;
 
   await saveSettings(db, { lastCelebrated: snap.today });
-  // In the app, the Today screen's flame animation is the celebration.
-  if (inBackground) await notifyGoalComplete(settings, snap.todayGoal, snap.streak.current);
+  const goal = snap.todayGoal;
+  // The coach congratulates (in the chat and on Today); in the background, as the notification too.
+  const congrats = settings.coachEnabled
+    ? runCongrats(db, snap, settings).catch(() => null)
+    : Promise.resolve(null);
+  if (!inBackground) return; // in the app, the flame animation; the coach's note arrives on Today
+  const m = await congrats;
+  if (m) await notifyCoachNote('🎉 Goal complete!', m.text);
+  else await notifyGoalComplete(settings, goal, snap.streak.current);
 }

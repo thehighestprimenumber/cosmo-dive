@@ -412,7 +412,7 @@ function CoachNote({ today, syncedAt }: { today: string; syncedAt: number }) {
     let live = true;
     loadChat(db)
       .then((all) => {
-        const last = [...all].reverse().find((m) => m.role === 'assistant' && m.checkin);
+        const last = [...all].reverse().find((m) => m.role === 'assistant' && (m.checkin || m.congrats));
         if (live) setNote(last?.role === 'assistant' && toDateKey(last.at) === today ? last : null);
       })
       .catch(() => {});
@@ -425,7 +425,7 @@ function CoachNote({ today, syncedAt }: { today: string; syncedAt: number }) {
   return (
     <Pressable onPress={() => router.push('/coach')}>
       <Card style={{ borderColor: colors.accent }}>
-        <Text style={styles.label}>☀️ From your coach</Text>
+        <Text style={styles.label}>{note.congrats ? '🎉 From your coach' : '☀️ From your coach'}</Text>
         <Text style={styles.body}>{note.text}</Text>
         <Text style={[styles.hint, { color: colors.accent }]}>
           {pending ? `${pending} suggestion${pending > 1 ? 's' : ''} to look at · ` : ''}Open the chat ›

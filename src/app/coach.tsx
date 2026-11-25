@@ -140,6 +140,7 @@ export default function CoachScreen() {
             ) : (
               <View key={m.id} style={[bubble, { alignSelf: 'flex-start', backgroundColor: colors.card }]}>
                 {m.checkin ? <Text style={styles.label}>☀️ Morning check-in</Text> : null}
+                {m.congrats ? <Text style={styles.label}>🎉 Goal complete</Text> : null}
                 <Text style={[styles.body, m.error && { color: colors.missed }]}>{m.text}</Text>
                 {m.error && (
                   <Pressable onPress={() => retry(m.id)} disabled={sending} hitSlop={8} style={{ marginTop: 6 }}>

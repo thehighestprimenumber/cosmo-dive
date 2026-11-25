@@ -77,6 +77,14 @@ export async function notifyCoachReview(summary: string, proposals: number): Pro
   });
 }
 
+/** A note from the coach with its own title (e.g. congratulations). */
+export async function notifyCoachNote(title: string, text: string): Promise<void> {
+  await Notifications.scheduleNotificationAsync({
+    content: { title, body: text.length > 160 ? text.slice(0, 157) + '…' : text },
+    trigger: { channelId: CHANNEL },
+  });
+}
+
 /** The coach's morning check-in. */
 export async function notifyCheckin(text: string, proposals: number): Promise<void> {
   await Notifications.scheduleNotificationAsync({

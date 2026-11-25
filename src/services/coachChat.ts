@@ -264,3 +264,45 @@ export async function runDailyCheckin(
     return null; // a missed check-in is fine
   }
 }
+
+const CONGRATS_PROMPT = `The walker just completed today's goal. This is not a message from them: they'll get your words as a notification. Write 1–2 short, warm, specific sentences of congratulations (use the numbers: how much, how far over the goal, the streak, the week so far). No proposals. Set worth_sending to true.`;
+
+/**
+ * When today's goal is completed: a short congratulation from the coach,
+ * saved in the chat. Null when the coach is off, there's no key, or on error.
+ */
+export async function runCongrats(
+  db: SQLiteDatabase,
+  snap: Snapshot,
+  settings: Settings,
+  now = new Date(),
+  fetchImpl?: typeof fetch,
+): Promise<Extract<ChatMessage, { role: 'assistant' }> | null> {
+  if (!snap.todayProgress?.done) return null;
+  const apiKey = await getApiKey();
+  if (!apiKey) return null;
+  try {
+    const history = await loadChat(db);
+    const context = contextFor(snap, settings, now);
+    const { json } = await askClaude({
+      apiKey,
+      system: SYSTEM,
+      schema: CHECKIN_SCHEMA as unknown as Record<string, unknown>,
+      db,
+      purpose: 'congrats',
+      messages: [
+        ...historyMessages(history, 6),
+        { role: 'user', content: `${CONGRATS_PROMPT}\n\nCurrent data (JSON):\n${JSON.stringify(context)}` },
+      ],
+      fetchImpl,
+    });
+    const t = now.getTime();
+    const m = chatReplyFrom({ ...(json as object), proposals: [] }, checkContext(snap, settings), newId(t), t);
+    if (m.role !== 'assistant') return null;
+    const message = { ...m, congrats: true };
+    await saveChatMessage(db, message);
+    return message;
+  } catch {
+    return null; // the plain notification goes out instead
+  }
+}

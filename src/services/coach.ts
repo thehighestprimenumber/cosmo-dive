@@ -149,7 +149,7 @@ export async function askClaude(opts: {
 
 export type CoachCall = {
   at: number;
-  purpose: 'chat' | 'review' | 'checkin';
+  purpose: 'chat' | 'review' | 'checkin' | 'congrats';
   /** strict: JSON schema enforced; lenient: plan B after a 400. */
   mode: 'strict' | 'lenient';
   ms: number;

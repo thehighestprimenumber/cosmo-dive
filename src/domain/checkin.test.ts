@@ -4,9 +4,10 @@ import { addDays } from './dates';
 
 const THU = '2026-11-26';
 const goal = { kind: 'distance' as const, meters: 5000, suggestedSport: 'walk' as const };
-const day = (date: string, done: boolean, recovery = false) => ({
+const day = (date: string, done: boolean, recovery = false, value = done ? 5000 : 1000) => ({
   date,
   goal,
+  value,
   done,
   status: done ? ('done' as const) : ('rest' as const),
   meta: recovery ? { base: 0, notes: [], recovery: true } : undefined,
@@ -46,6 +47,13 @@ describe('when the coach checks in', () => {
       [addDays(THU, -2), day(addDays(THU, -2), false)],
     ]);
     expect(checkinReasons({ ...ordinary, days: afterRecovery })).toEqual([]);
+  });
+
+  it('yesterday beat its goal by 20%+: the coach congratulates', () => {
+    const beaten = (m: number) =>
+      new Map([[addDays(THU, -1), day(addDays(THU, -1), true, false, m)]]);
+    expect(checkinReasons({ ...ordinary, days: beaten(6500) })[0]).toContain('130% of it');
+    expect(checkinReasons({ ...ordinary, days: beaten(5900) })).toEqual([]); // just done: nothing to say
   });
 
   it('falling behind from Thursday, no rest days left with a streak, a recent conversation', () => {

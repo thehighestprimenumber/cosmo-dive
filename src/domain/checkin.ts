@@ -13,7 +13,15 @@ export const FOLLOW_UP_HOURS = 36;
 /** Behind on the week: from Thursday, under 60% of where the week "should" be. */
 const BEHIND_SHARE = 0.6;
 
-type DayLike = { date: DateKey; goal: GoalSpec | null; done: boolean; status: DayStatus; meta?: GoalMeta };
+type DayLike = { date: DateKey; goal: GoalSpec | null; value: number; done: boolean; status: DayStatus; meta?: GoalMeta };
+
+/** Beating the goal by this much (120%) is worth a word in the morning. */
+export const BEAT_BY = 1.2;
+
+/** The goal's target in its own unit (metres or seconds). */
+export function goalTarget(goal: GoalSpec): number {
+  return 'meters' in goal ? goal.meters : goal.seconds;
+}
 
 export type CheckinInput = {
   today: DateKey;
@@ -36,6 +44,10 @@ export function checkinReasons(i: CheckinInput): string[] {
   const reasons: string[] = [];
   if (i.todayRecovery) reasons.push('Yesterday was a very big day: today is a recovery day.');
   if (i.yesterdayFelt != null && i.yesterdayFelt >= 9) reasons.push(`Yesterday's key walk felt ${i.yesterdayFelt}/10.`);
+  const y = i.days.get(addDays(i.today, -1));
+  if (y?.goal && y.done && y.value >= goalTarget(y.goal) * BEAT_BY) {
+    reasons.push(`Yesterday's goal beaten by far: ${Math.round((y.value / goalTarget(y.goal)) * 100)}% of it. Congratulate them.`);
+  }
   if (i.todayReadiness === 'low') reasons.push('Readiness is low today (short night or raised resting heart rate).');
 
   const missed = (d: DateKey) => {

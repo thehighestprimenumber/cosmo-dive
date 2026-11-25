@@ -45,6 +45,8 @@ export type ChatMessage =
       error?: boolean;
       /** A morning check-in the coach started (not an answer). */
       checkin?: boolean;
+      /** Congratulations the coach sent when today's goal was completed. */
+      congrats?: boolean;
     };
 
 /** Messages sent back to the model (older ones are kept on the phone but not sent). */
@@ -351,7 +353,11 @@ export function chatReplyFrom(raw: unknown, c: ChatCheckContext, id: string, at:
 /** How a past message reads back to the model (with what happened to its proposals). */
 export function historyText(m: ChatMessage): string {
   if (m.role === 'user') return m.text;
-  const text = m.checkin ? `[Morning check-in you sent] ${m.text}` : m.text;
+  const text = m.checkin
+    ? `[Morning check-in you sent] ${m.text}`
+    : m.congrats
+      ? `[Congratulations you sent when the goal was done] ${m.text}`
+      : m.text;
   if (!m.proposals.length) return text;
   const what = m.proposals.map((p) => `${p.change} (${p.status === 'pending' ? 'not decided' : p.status})`).join('; ');
   return `${text}\n[Proposed: ${what}]`;

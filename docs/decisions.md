@@ -2,6 +2,13 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-25: the coach congratulates
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Goal done | When today's goal completes, the coach writes 1–2 specific sentences (numbers, streak), once a day. Saved in the chat ("🎉 Goal complete"), shown on Today, and in the background it's the notification (the plain "Goal complete!" one if the coach is off or fails) | `runCongrats` in `src/services/coachChat.ts`, called from `afterSync` |
+| Morning | Yesterday's goal done at ≥120% is a check-in reason: the morning message congratulates | `BEAT_BY` in `src/domain/checkin.ts` |
+
 ## 2026-11-23: move minutes from Google Fit (via Health Connect)
 
 Samsung Health has write permission but writes nothing to Health Connect on the owner's phone; Google Fit writes exercise, distance and **activity intensity** (moderate/vigorous minutes, its "move minutes").
