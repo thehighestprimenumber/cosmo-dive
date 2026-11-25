@@ -35,7 +35,7 @@ const source: ActivitySource = {
   requestAccess: async () => true,
   getActivities: async (from, to) => history.filter((a) => a.start >= from.getTime() && a.start < to.getTime()),
 };
-const base: Settings = { ...DEFAULT_SETTINGS, startDate: '2026-11-16', restDaysPerWeek: 1, onboarded: true, coachEnabled: true };
+const base: Settings = { ...DEFAULT_SETTINGS, startDate: '2026-11-16', restDaysPerWeek: 1, onboarded: true, coachEnabled: true, strengthInGoal: false };
 
 function claudeSays(json: unknown) {
   const bodies: Record<string, unknown>[] = [];

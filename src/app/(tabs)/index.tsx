@@ -14,6 +14,7 @@ import { sourceFor } from '../../sources';
 import { useApp } from '../../state/AppState';
 import { Button, Card, ProgressBar, styles } from '../../ui/components';
 import { RateCard, StrengthCard } from '../../ui/TodayExtras';
+import { FOCUS_NAME } from '../../domain/strength';
 import { colors, STATUS_COLOR } from '../../ui/theme';
 
 export default function TodayScreen() {
@@ -161,6 +162,13 @@ export default function TodayScreen() {
                 : `${formatValue(goal, progress.value)} of ${formatValue(goal, progress.target)}`}
             </Text>
             {goal.kind === 'distance' && <DistanceBreakdown activities={snapshot.todayActivities} rideFactor={settings.rideFactor} />}
+            {progress.strength && (
+              <Text style={styles.body}>
+                {progress.strength.done ? '✅' : '💪'} + {progress.strength.minutes} min of strength ·{' '}
+                {FOCUS_NAME[progress.strength.focus].toLowerCase()}
+                {progress.strength.done ? ' · done' : progress.value >= progress.target ? ' · the part left' : ''}
+              </Text>
+            )}
             {progress.ascent && (
               <Text style={styles.body}>
                 ⛰️ {Math.round(progress.ascent.value)} of {progress.ascent.target} m climbed (in the same walk)

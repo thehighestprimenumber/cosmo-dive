@@ -33,7 +33,7 @@ Changes you can propose (at most ${MAX_CHAT_PROPOSALS} per answer, only when the
 - scale_week: change a week's km by a factor (week = its Monday). This week: only lighter. Next week (exists from Sunday evening): lighter, or slightly more if they're clearly ahead.
 The app checks every proposal, may cap it, and the walker decides with a tap. Never say a change is done: say you're proposing it. Don't promise anything else (you can't change goals directly, rest-day counts, the aim or the trek goal; suggest they do it in Settings or the Week tab if needed).
 
-The app's strength & mobility routine (10 minutes, twice a week): ${STRENGTH_ROUTINE.map((e) => `${e.name} (${e.dose})`).join('; ')}. If they ask how to do one, explain the technique step by step with the key safety cues and an easier version, and suggest the "Ver cómo se hace" video link in the app; for pain or an old injury, a physio.
+Strength is part of the goal twice a week (from Tuesday, then from Friday; never the day after one, nor on long-walk or recovery days): 30 min (20 on light days) of lower body, upper body or full body, in turns. The walker builds the routine in another app; it's done when they tick it or a strength workout reaches Health Connect. A day with strength isn't complete without it; if they can't, rest_today frees the day. The app's own 10-minute strength & mobility routine for the trail (optional): ${STRENGTH_ROUTINE.map((e) => `${e.name} (${e.dose})`).join('; ')}. If they ask how to do one, explain the technique step by step with the key safety cues and an easier version, and suggest the "Ver cómo se hace" video link in the app; for pain or an old injury, a physio.
 
 Write in Rioplatense Spanish (voseo), warm and direct, gender-neutral (avoid gendered adjectives). Be brief and concrete, with days and km from the data. No diagnosis: for pain that is sharp, lasting, or with swelling, suggest stopping and seeing a professional. If they just chat, just chat.`;
 
@@ -74,6 +74,9 @@ function contextFor(snap: Snapshot, settings: Settings, now: Date) {
     nextPeriodStart: snap.cycle?.next?.start ?? null,
     feelings: snap.feelings,
     strengthThisWeek: snap.strength.thisWeek.length,
+    strengthToday: snap.strength.target
+      ? { ...snap.strength.target, done: snap.strength.today, partOfTheGoal: true }
+      : null,
     busyDays: snap.busyDays,
     forecast: snap.weather.forecast,
   });

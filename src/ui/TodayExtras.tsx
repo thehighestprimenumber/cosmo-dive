@@ -5,7 +5,7 @@ import { Linking, Pressable, Text, View } from 'react-native';
 import { saveFeeling, setExtra } from '../data/db';
 import { RPE_LABELS } from '../domain/effort';
 import type { SessionKind } from '../domain/plan';
-import { SAFETY_NOTE, STRENGTH_PER_WEEK, STRENGTH_ROUTINE, STRENGTH_XP, videoUrl, type Exercise } from '../domain/strength';
+import { FOCUS_NAME, SAFETY_NOTE, STRENGTH_PER_WEEK, STRENGTH_ROUTINE, STRENGTH_XP, videoUrl, type Exercise } from '../domain/strength';
 import { useApp } from '../state/AppState';
 import { Button, Card, Label, styles } from './components';
 import { colors } from './theme';
@@ -55,33 +55,46 @@ export function RateCard() {
   );
 }
 
-/** Strength & mobility: 10 minutes, twice a week, ticked off by hand. */
+/**
+ * Strength: twice a week it's part of the day's goal (minutes and focus; your
+ * other app makes the routine). Ticked here, from the watch, or by a strength
+ * workout in Health Connect. The app's 10-minute trail routine stays available.
+ */
 export function StrengthCard() {
   const db = useSQLiteContext();
-  const { snapshot, refresh } = useApp();
+  const { snapshot, settings, refresh } = useApp();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!snapshot) return null;
-  const { thisWeek, today } = snapshot.strength;
+  const { thisWeek, today, ticked, target } = snapshot.strength;
   const done = thisWeek.length;
   // Done for the week and not today: nothing to show.
   if (done >= STRENGTH_PER_WEEK && !today) return null;
   const toggle = async () => {
     setBusy(true);
     try {
-      await setExtra(db, snapshot.today, 'strength', !today);
+      await setExtra(db, snapshot.today, 'strength', !ticked);
       await refresh();
     } finally {
       setBusy(false);
     }
   };
+  const inGoal = settings?.strengthInGoal ?? true;
   return (
-    <Card style={today ? { borderColor: colors.done } : undefined}>
+    <Card style={today ? { borderColor: colors.done } : target ? { borderColor: colors.accent } : undefined}>
       <Pressable onPress={() => setOpen((o) => !o)}>
-        <Label>🦵 Strength & mobility · {done} of {STRENGTH_PER_WEEK} this week</Label>
+        <Label>
+          {target ? `💪 Strength today · ${target.minutes} min ${FOCUS_NAME[target.focus].toLowerCase()}` : '💪 Strength'} ·{' '}
+          {done} of {STRENGTH_PER_WEEK} this week
+        </Label>
         <Text style={styles.muted}>
-          10 minutes for trail legs and ankles, any {STRENGTH_PER_WEEK} days you like. +{STRENGTH_XP} XP.{' '}
-          <Text style={{ color: colors.accent }}>{open ? 'Hide' : 'Show'} the routine</Text>
+          {target
+            ? `Part of today's goal. Do it with your routine app: a strength workout of ${Math.ceil(target.minutes * 0.8)}+ min that reaches Health Connect ticks it, or mark it here.`
+            : inGoal
+              ? 'Twice a week it’s part of the goal (from Tuesday, then from Friday). Did one on another day? Mark it and the plan adapts.'
+              : `Any ${STRENGTH_PER_WEEK} days you like.`}{' '}
+          +{STRENGTH_XP} XP.{' '}
+          <Text style={{ color: colors.accent }}>{open ? 'Hide' : 'Show'} the 10-min trail routine</Text>
         </Text>
       </Pressable>
       {open && (
@@ -90,15 +103,19 @@ export function StrengthCard() {
             <ExerciseView key={x.id} exercise={x} />
           ))}
           <Text style={[styles.hint, { marginTop: 8 }]}>⚠️ {SAFETY_NOTE}</Text>
+          {!today && <Button title="▶ Start the guided 10-min routine" onPress={() => router.push('/strength')} />}
         </View>
       )}
-      {!today && <Button title="▶ Start guided session" onPress={() => router.push('/strength')} />}
-      <Button
-        variant="secondary"
-        title={today ? '✓ Done today (undo)' : 'Already did it: mark done'}
-        onPress={toggle}
-        disabled={busy}
-      />
+      {today && !ticked ? (
+        <Text style={[styles.body, { marginTop: 6 }]}>✓ Done today (strength workout in Health Connect)</Text>
+      ) : (
+        <Button
+          variant="secondary"
+          title={ticked ? '✓ Done today (undo)' : 'Did it: mark done'}
+          onPress={toggle}
+          disabled={busy}
+        />
+      )}
     </Card>
   );
 }

@@ -88,6 +88,8 @@ export type ChatContextInput = {
   /** Your 1–10 ratings of key sessions, by day. */
   feelings?: Record<DateKey, number>;
   strengthThisWeek?: number;
+  /** Today's strength part of the goal, if any. */
+  strengthToday?: { focus: string; minutes: number; done: boolean; partOfTheGoal: boolean } | null;
   /** Work days from your calendar (this week and next). */
   busyDays?: DateKey[];
   /** The next days' forecast, if a town is set. */
@@ -158,6 +160,7 @@ export function buildChatContext(i: ChatContextInput) {
     nextWeek: i.nextPlan ? weekView(i.nextPlan, today, share) : null,
     recentWeeksKm: i.recentWeeksKm,
     strengthSessionsThisWeek: i.strengthThisWeek ?? 0,
+    strengthToday: i.strengthToday ?? null,
     workDays: (i.busyDays ?? []).filter((d) => d >= today),
     forecast: (i.forecast ?? []).slice(0, 8),
     streak: i.streak,

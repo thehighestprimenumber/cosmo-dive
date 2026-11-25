@@ -2,6 +2,20 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-25: strength is part of the goal, twice a week
+
+The owner wants strength in the goal 2 days a week, with another app building the routine: the plan only says minutes and type.
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Which days | The first from Tuesday, the second from Friday; never the day after one (48 h), on a long-walk/back-to-back/trek day, or a recovery day. Brisk-walk days are allowed. Not done on its day, it stays on the next days | Flexible like rest days. `strengthFor` in `src/domain/strength.ts` (`EARLIEST_DAY`) |
+| How much | 30 min; 20 on light weeks, low readiness, or a day eased by the coach | `STRENGTH_MINUTES(_LIGHT)` |
+| What | Lower body → upper body → full body, rotating across weeks (all three get done; trekking needs legs most, and full body covers them again) | `ROTATION` |
+| Part of the goal | A day with strength is complete only with both the walking goal and the strength part; otherwise it's a day without the goal (uses a rest day). Stored in the goal (`meta.strength`), so past days never change. `PLAN_VERSION` 13: today's goal is redone if not done yet | `progressFor` in `sync.ts` |
+| Done | Ticked on Today, finished on the watch's guided routine, or a strength workout (strength training, weightlifting, calisthenics, HIIT, pilates, boot camp, exercise class) in Health Connect of 80%+ of the minutes. A 15+ min one on any other day counts for the week | So the routine app only has to write to Health Connect |
+| Off switch | Settings → "Strength in the goal" (then it's optional again, 2 a week, XP only) | `strengthInGoal` |
+| Coach | Knows today's strength part; if you can't do it, "rest today" frees the day | |
+
 ## 2026-11-25: the coach congratulates
 
 | Topic | Decision | Why / how to change |

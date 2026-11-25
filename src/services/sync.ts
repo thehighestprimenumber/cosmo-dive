@@ -38,7 +38,7 @@ import type { WorkCalendar } from './calendar';
 import type { WeatherSource } from './weather';
 import { weatherSuggestions, type DayForecast, type WeatherSuggestion } from '../domain/weather';
 import { hardestIn, sessionToRate } from '../domain/effort';
-import { STRENGTH_XP, strengthDaysIn } from '../domain/strength';
+import { type StrengthTarget, FOCUS_NAME, STRENGTH_XP, strengthDaysIn, strengthDone, strengthDoneDays, strengthFor } from '../domain/strength';
 import { planVolume, rebalancedDayKm, recentWeeksKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
 import { generateKeySession } from '../domain/sessions';
 import { withCoachFactor } from '../domain/coach';
@@ -60,7 +60,7 @@ import { activitiesOn, progressOf } from '../domain/progress';
 import { usualStartTime, type TimeOfDay } from '../domain/habits';
 import { readinessFor, type Night, type ReadinessLevel } from '../domain/readiness';
 import { computeStreak, type StreakState } from '../domain/streak';
-import type { Activity, DateKey, DayResult, DayStatus, GoalMeta, GoalSpec, Progress, RegularKind, Settings } from '../domain/types';
+import type { Activity, DailyGoal, DateKey, DayResult, DayStatus, GoalMeta, GoalSpec, Progress, RegularKind, Settings } from '../domain/types';
 import type { ActivitySource } from '../sources/ActivitySource';
 
 /** Days that are always re-checked against Health Connect (late syncs, edits, deletions). */
@@ -110,7 +110,14 @@ export type Snapshot = {
   /** The forecast (if you set your town) and walks worth moving because of it. */
   weather: { forecast: DayForecast[]; suggestions: WeatherSuggestion[] };
   /** Strength & mobility sessions ticked off this week, and whether today. */
-  strength: { thisWeek: DateKey[]; today: boolean };
+  strength: {
+    thisWeek: DateKey[];
+    today: boolean;
+    /** Ticked by hand (or from the watch) today, so it can be unticked. */
+    ticked: boolean;
+    /** Today's strength part of the goal, if today has one. */
+    target: StrengthTarget | null;
+  };
   /** This week's km: planned, done, left, last week's, and each session's share. */
   week: {
     volume: WeekVolume;
@@ -255,9 +262,11 @@ export async function refresh(
 
   // How hard key sessions felt (your ratings), and strength sessions ticked off.
   const feelings = await loadFeelings(db, addDays(fetchFrom, -7), today);
-  const strengthDays = (await loadExtras(db, addDays(thisMonday, -7), today))
+  const strengthTicks = (await loadExtras(db, minKey(start, addDays(thisMonday, -7)), today))
     .filter((x) => x.kind === 'strength')
     .map((x) => x.date);
+  // Ticked, from the watch, or a strength workout in Health Connect.
+  const strengthDays = strengthDoneDays(strengthTicks, activities);
   // Work days from your calendar, this week and next.
   const busy = opts.calendar
     ? await opts.calendar.busyDays(thisMonday, addDays(thisMonday, 13)).catch(() => [] as DateKey[])
@@ -265,10 +274,16 @@ export async function refresh(
   const forecast = opts.weather ? await opts.weather.forecast().catch(() => [] as DayForecast[]) : [];
   const strengthTotal = (await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM extras WHERE kind = 'strength'"))?.n ?? 0;
 
-  const doneOn = (d: DateKey) => {
-    const g = goals.get(d)?.goal;
-    return !!g && progressOf(g, activitiesOn(d, activities), settings).done;
+  // A day's progress: its walking goal, and its strength part when it has one (both needed).
+  const progressFor = (daily: DailyGoal | undefined, d: DateKey): Progress | null => {
+    if (!daily?.goal) return null;
+    const p = progressOf(daily.goal, activitiesOn(d, activities), settings);
+    const st = daily.meta?.strength;
+    if (!st) return p;
+    const stDone = strengthDone(st, d, strengthTicks, activities);
+    return { ...p, done: p.done && stDone, strength: { ...st, done: stDone } };
   };
+  const doneOn = (d: DateKey) => !!progressFor(goals.get(d), d)?.done;
   const rf = settings.rideFactor;
 
   // Your cycle (optional): known and predicted periods place the light week.
@@ -517,6 +532,30 @@ export async function refresh(
           ? generateKeySession({ date, kind: key.kind, settings, activities, history, readiness, targetKm: 5, feelings })
           : generateGoal({ date, settings, activities, history, statuses, readiness, kind });
       }
+      // Strength twice a week, as part of the goal.
+      const coachEased = date === today && settings.coachToday?.date === today;
+      const strength = daily.goal && settings.strengthInGoal
+        ? strengthFor({
+            date,
+            doneDays: strengthDays,
+            keyKind: key?.kind ?? (daily.goal.kind === 'long_walk' ? 'long_walk' : undefined),
+            recovery: !!daily.meta?.recovery,
+            light: !!volume?.light || readiness?.level === 'low' || coachEased,
+          })
+        : null;
+      if (strength && daily.meta) {
+        daily = {
+          ...daily,
+          meta: {
+            ...daily.meta,
+            strength,
+            notes: [
+              ...daily.meta.notes,
+              `💪 Plus ${strength.minutes} min of strength (${FOCUS_NAME[strength.focus].toLowerCase()}): ${strength.minutes < 30 ? 'a lighter day, so shorter. ' : ''}2 a week, part of the goal.`,
+            ],
+          },
+        };
+      }
       await insertGoal(db, daily);
       goals.set(date, daily);
     }
@@ -528,7 +567,7 @@ export async function refresh(
       continue;
     }
 
-    const p = daily.goal ? progressOf(daily.goal, activitiesOn(date, activities), settings) : null;
+    const p = progressFor(daily, date);
     const result: DayResult = {
       date,
       goal: daily.goal,
@@ -619,7 +658,12 @@ export async function refresh(
         (x) => !settings.weatherDismissed.includes(x.key),
       ),
     },
-    strength: { thisWeek: strengthDaysIn(strengthDays, thisMonday), today: strengthDays.includes(today) },
+    strength: {
+      thisWeek: strengthDaysIn(strengthDays, thisMonday),
+      today: strengthDays.includes(today),
+      ticked: strengthTicks.includes(today),
+      target: goals.get(today)?.meta?.strength ?? null,
+    },
     plan,
     nextPlan,
     week: (() => {
@@ -691,7 +735,7 @@ export async function refresh(
     todayNotes: goals.get(today)?.meta?.notes ?? [],
     todayReadiness: goals.get(today)?.meta?.readiness ?? 'unknown',
     usualTime: usualStartTime(activities, today),
-    todayProgress: todayGoal ? progressOf(todayGoal, todayActivities, settings) : null,
+    todayProgress: progressFor(goals.get(today), today),
     todayActivities,
     streak,
     days,

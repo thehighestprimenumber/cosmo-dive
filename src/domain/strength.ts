@@ -1,12 +1,91 @@
-import { addDays } from './dates';
-import type { DateKey } from './types';
+import { addDays, daysBetween, mondayOf, toDateKey } from './dates';
+import type { Activity, DateKey } from './types';
 
 /**
- * Strength & mobility for trekking: 10 minutes, twice a week, any days you
- * like. You tick it off (the watch can't tell). Worth XP, never your streak.
+ * Strength, twice a week, as part of the day's goal: the plan says how many
+ * minutes of what (lower body, upper body, full body); another app builds the
+ * routine. It's done when you tick it, the watch's guided session ends, or a
+ * strength workout of about that length reaches Health Connect.
  */
 export const STRENGTH_PER_WEEK = 2;
 export const STRENGTH_XP = 5;
+export const STRENGTH_MINUTES = 30;
+/** Light week, low readiness, or a day the coach eased: shorter. */
+export const STRENGTH_MINUTES_LIGHT = 20;
+/** A workout this much of the target counts (a 27-minute session for 30). */
+const ENOUGH = 0.8;
+/** The earliest day (0 = Monday) for the week's 1st and 2nd session: Tuesday, then Friday. */
+const EARLIEST_DAY = [1, 4];
+
+export type StrengthFocus = 'lower' | 'upper' | 'full';
+/** Stored with the day's goal (meta.strength): part of that day's goal. */
+export type StrengthTarget = { focus: StrengthFocus; minutes: number };
+
+export const FOCUS_NAME: Record<StrengthFocus, string> = {
+  lower: 'Lower body',
+  upper: 'Upper body',
+  full: 'Full body',
+};
+const ROTATION: StrengthFocus[] = ['lower', 'upper', 'full'];
+
+/** Health Connect exercise types that are a strength workout. */
+const STRENGTH_LABELS = new Set([
+  'strength training',
+  'weightlifting',
+  'calisthenics',
+  'high intensity interval training',
+  'pilates',
+  'boot camp',
+  'exercise class',
+]);
+export const isStrengthWorkout = (a: Activity) => a.sport === 'other' && !!a.label && STRENGTH_LABELS.has(a.label);
+
+/** Minutes of strength workouts recorded on a day. */
+export function strengthMinutesOn(date: DateKey, activities: Activity[]): number {
+  return activities
+    .filter((a) => isStrengthWorkout(a) && toDateKey(a.start) === date)
+    .reduce((s, a) => s + a.durationS / 60, 0);
+}
+
+/** Days with strength done: ticked (or from the watch), or a 15+ minute strength workout recorded. */
+export function strengthDoneDays(ticked: DateKey[], activities: Activity[]): DateKey[] {
+  const recorded = activities.filter(isStrengthWorkout).map((a) => toDateKey(a.start));
+  return [...new Set([...ticked, ...recorded.filter((d) => strengthMinutesOn(d, activities) >= 15)])].sort();
+}
+
+/** Is a day's strength part done? */
+export function strengthDone(target: StrengthTarget, date: DateKey, ticked: DateKey[], activities: Activity[]): boolean {
+  return ticked.includes(date) || strengthMinutesOn(date, activities) >= target.minutes * ENOUGH;
+}
+
+export type StrengthDayInput = {
+  date: DateKey;
+  /** Days with strength done (any week; only this week and yesterday matter). */
+  doneDays: DateKey[];
+  /** Today's key session, if any. */
+  keyKind?: string;
+  recovery: boolean;
+  /** Light week, low readiness, or eased by the coach. */
+  light: boolean;
+};
+
+/**
+ * Strength today? Twice a week: from Tuesday for the first and Friday for the
+ * second, never the day after one (48 h), on a long walk or trek day, or on a
+ * recovery day. Not done on its day, it stays on the next ones.
+ * The focus rotates lower → upper → full across the weeks.
+ */
+export function strengthFor(i: StrengthDayInput): StrengthTarget | null {
+  const monday = mondayOf(i.date);
+  const doneThisWeek = i.doneDays.filter((d) => d >= monday && d < i.date).length;
+  if (doneThisWeek >= STRENGTH_PER_WEEK) return null;
+  if (i.recovery || i.doneDays.includes(addDays(i.date, -1))) return null;
+  if (i.keyKind && i.keyKind !== 'brisk_walk') return null;
+  if (daysBetween(monday, i.date) < EARLIEST_DAY[doneThisWeek]) return null;
+  const week = Math.floor(daysBetween('2026-01-05', monday) / 7);
+  const focus = ROTATION[(((week * STRENGTH_PER_WEEK + doneThisWeek) % 3) + 3) % 3];
+  return { focus, minutes: i.light ? STRENGTH_MINUTES_LIGHT : STRENGTH_MINUTES };
+}
 
 export type Exercise = {
   id: string;

@@ -82,6 +82,8 @@ export type GoalMeta = {
   recovery?: boolean;
   /** Brisk walk: the pace level (s/km) before today-only tweaks. */
   pace?: number;
+  /** Strength is part of this day's goal: this many minutes of this kind. */
+  strength?: { focus: 'lower' | 'upper' | 'full'; minutes: number };
 };
 
 /**
@@ -173,6 +175,8 @@ export type Settings = {
   lastAutoBackup: { at: number; ok: boolean; error?: string } | null;
   /** Strength sessions from the watch already ticked here (so an untick sticks). */
   watchStrengthImported: DateKey[];
+  /** Strength twice a week as part of the goal (minutes and focus; another app makes the routine). */
+  strengthInGoal: boolean;
 };
 
 export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
@@ -206,6 +210,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'startDate'> = {
   backupFolder: null,
   lastAutoBackup: null,
   watchStrengthImported: [],
+  strengthInGoal: true,
 };
 
 export type Progress = {
@@ -215,6 +220,8 @@ export type Progress = {
   done: boolean;
   /** Long walks with a climb target: metres climbed in that walk vs. the target. */
   ascent?: { value: number; target: number };
+  /** The day's strength part, when it has one; `done` above needs it too. */
+  strength?: { focus: 'lower' | 'upper' | 'full'; minutes: number; done: boolean };
 };
 
 /** A day's goal plus how much of it was achieved. */

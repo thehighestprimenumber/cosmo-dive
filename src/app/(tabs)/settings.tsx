@@ -95,6 +95,23 @@ function SettingsForm({ settings }: { settings: Settings }) {
         </Card>
 
         <Card>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Label>💪 Strength in the goal</Label>
+            <Switch
+              value={settings.strengthInGoal}
+              onValueChange={(v) =>
+                void updateSettings({ strengthInGoal: v }).then(() => refresh({ regenerateToday: true }))
+              }
+            />
+          </View>
+          <Text style={styles.muted}>
+            Twice a week (from Tuesday, then from Friday) the goal adds 30 min of strength: lower body, upper body or
+            full body, in turns; 20 min on light days. Build the routine in any app: a strength workout in Health
+            Connect ticks it, or mark it on Today.
+          </Text>
+        </Card>
+
+        <Card>
           <Field
             label="Max heart rate (bpm)"
             value={maxHr}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadGoals, migrate } from '../data/db';
+import { loadGoals, migrate, setExtra } from '../data/db';
 import { fakeDb } from '../test/fakeDb';
 import { addDays, startOfDay, toDateKey } from '../domain/dates';
 import { DEFAULT_SETTINGS, type Activity, type Settings } from '../domain/types';
@@ -32,7 +32,7 @@ function sourceOf(acts: Activity[]): ActivitySource {
   };
 }
 
-const settings: Settings = { ...DEFAULT_SETTINGS, restDaysPerWeek: 2, startDate: '2026-11-02', onboarded: true };
+const settings: Settings = { ...DEFAULT_SETTINGS, restDaysPerWeek: 2, startDate: '2026-11-02', onboarded: true, strengthInGoal: false };
 
 describe('refresh', () => {
   it('back-fills one goal per day, never rewrites them, and builds a streak', async () => {
@@ -451,5 +451,23 @@ describe('refresh', () => {
     expect(snap.aim?.averageKm).toBeCloseTo((13.97 + 13 * 12) / 14, 1);
     expect(snap.week.doneKm).toBeGreaterThan(60);
   });
-});
 
+  it('strength twice a week is part of the goal: walked but no strength is not done until ticked', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const s = { ...settings, strengthInGoal: true };
+    const acts = Array.from({ length: 26 }, (_, i) => walk(addDays('2026-11-02', i), 90));
+    const now = new Date(2026, 10, 27, 20, 0); // Friday
+    const snap = await refresh(db, sourceOf(acts), s, { now });
+    const week = await loadGoals(db, '2026-11-23', '2026-11-27');
+    const first = week.find((g) => g.meta?.strength);
+    expect(first).toBeDefined();
+    expect(first!.date >= '2026-11-24').toBe(true); // from Tuesday
+    expect(first!.meta!.notes.some((n) => n.includes('min of strength'))).toBe(true);
+    expect(snap.days.get(first!.date)?.done).toBe(false); // walked 90 min, no strength
+    await setExtra(db, first!.date, 'strength', true);
+    const after = await refresh(db, sourceOf(acts), s, { now });
+    expect(after.days.get(first!.date)?.done).toBe(true);
+    expect(after.strength.thisWeek).toContain(first!.date);
+  });
+});
