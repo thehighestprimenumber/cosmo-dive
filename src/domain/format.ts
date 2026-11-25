@@ -33,7 +33,7 @@ export function goalTitle(goal: GoalSpec, settings: Pick<Settings, 'rideFactor'>
         ? `Long walk: ${formatKm(goal.meters)} with ${goal.ascentM} m of climb`
         : `Long walk: ${formatKm(goal.meters)} in one go`;
     case 'brisk_walk':
-      return `Brisk walk: ${formatKm(goal.meters)} at ${formatPace(goal.paceSPerKm)} or faster`;
+      return `Brisk walk: ${formatKm(goal.meters)} at ${formatSpeed(goal.paceSPerKm)} or faster`;
   }
 }
 
@@ -41,6 +41,11 @@ export function goalTitle(goal: GoalSpec, settings: Pick<Settings, 'rideFactor'>
 export function formatPace(sPerKm: number): string {
   const total = Math.round(sPerKm);
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')} min/km`;
+}
+
+/** Seconds per km → "4.7 km/h" (what Galaxy watches show during a walk). */
+export function formatSpeed(sPerKm: number): string {
+  return `${(Math.floor((3600 / sPerKm) * 10) / 10).toFixed(1)} km/h`;
 }
 
 export function goalSubtitle(goal: GoalSpec, settings: Pick<Settings, 'maxHr'>): string {
@@ -56,7 +61,7 @@ export function goalSubtitle(goal: GoalSpec, settings: Pick<Settings, 'maxHr'>):
     case 'long_walk':
       return 'This week’s key session: one walk, hike or run, not several added up.';
     case 'brisk_walk':
-      return 'This week’s key session: walks at this average pace or faster add up.';
+      return `This week’s key session: walks at this average speed or faster add up (${formatPace(goal.paceSPerKm)}).`;
   }
 }
 
