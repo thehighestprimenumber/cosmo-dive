@@ -29,10 +29,7 @@
         "android.permission.health.READ_ACTIVITY_INTENSITY"
       ],
       "predictiveBackGestureEnabled": false,
-      "versionCode": 1,
-      "blockedPermissions": [
-        "android.permission.WRITE_CALENDAR"
-      ]
+      "versionCode": 1
     },
     "plugins": [
       "expo-router",

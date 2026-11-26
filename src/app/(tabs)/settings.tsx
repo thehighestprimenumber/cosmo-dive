@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, Platform, ScrollView, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Platform, ScrollView, Switch, Text, View } from 'react-native';
 import { openHealthConnectSettings } from 'react-native-health-connect';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { parseTime } from '../../domain/dates';
@@ -312,8 +312,10 @@ function WorkShifts({ settings }: { settings: Settings }) {
     };
   }, []);
 
+  const [asked, setAsked] = useState(false);
   const allow = async () => {
     const ok = await requestCalendarAccess();
+    setAsked(true);
     setAccess(ok);
     if (ok) setCalendars(await listCalendars().catch(() => []));
   };
@@ -333,6 +335,15 @@ function WorkShifts({ settings }: { settings: Settings }) {
         yourself stay put. The calendar is only read, on this phone.
       </Text>
       {access === false && <Button title="Read my calendar" variant="secondary" onPress={allow} />}
+      {access === false && asked && (
+        <>
+          <Text style={styles.hint}>
+            Android didn’t allow it. If no prompt showed up, allow Calendar in the app’s settings (Permissions →
+            Calendar).
+          </Text>
+          <Button title="Open app settings" variant="secondary" onPress={() => void Linking.openSettings()} />
+        </>
+      )}
       {access &&
         (calendars?.length ? (
           calendars.map((c) => (

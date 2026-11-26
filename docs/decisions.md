@@ -2,6 +2,13 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-26: calendar permission
+
+| Topic | Decision | Why / how to change |
+|---|---|---|
+| Write permission | `WRITE_CALENDAR` is no longer blocked in `app.json` | expo-calendar on Android asks for read and write together and checks both before listing calendars or events; with write blocked, "Read my calendar" was denied with no prompt. The app still never writes to the calendar |
+| Denied | After a denied request, Settings shows how to allow it and a button to the app's Android settings | |
+
 ## 2026-11-25: strength is part of the goal, twice a week
 
 The owner wants strength in the goal 2 days a week, with another app building the routine: the plan only says minutes and type.
