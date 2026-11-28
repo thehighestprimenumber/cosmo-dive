@@ -4,7 +4,8 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addDays, mondayOf } from '../../domain/dates';
 import { setExtra } from '../../data/db';
-import { FOCUS_NAME } from '../../domain/strength';
+import { BIG_DAY, bigDay, FOCUS_NAME } from '../../domain/strength';
+import { goalTarget } from '../../domain/progress';
 import { formatMinutes, formatValue, goalEmoji, goalTitle } from '../../domain/format';
 import type { DateKey, DayStatus } from '../../domain/types';
 import { RECHECK_DAYS } from '../../services/sync';
@@ -55,6 +56,7 @@ export default function CalendarScreen() {
 
   const monthName = new Date(ym.y, ym.m, 1).toLocaleDateString([], { month: 'long', year: 'numeric' });
   const day = selected ? snapshot?.days.get(selected) : undefined;
+  const big = !!day?.goal && bigDay(day.value, goalTarget(day.goal));
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -141,11 +143,13 @@ export default function CalendarScreen() {
                   <>
                     <Text style={[styles.body, { marginTop: 6 }]}>
                       {day.strengthDone ? '✅' : '💪'} + {day.meta.strength.minutes} min of strength ·{' '}
-                      {FOCUS_NAME[day.meta.strength.focus].toLowerCase()} · {day.strengthDone ? 'done' : 'not done'}
+                      {FOCUS_NAME[day.meta.strength.focus].toLowerCase()} ·{' '}
+                      {day.strengthDone ? 'done' : big ? 'covered by a big day' : 'not done'}
                     </Text>
-                    {!day.strengthDone && (
+                    {!day.strengthDone && !big && (
                       <Text style={styles.hint}>
-                        The day counts with both the walking goal and the strength part.
+                        The day counts with both the walking goal and the strength part, or with {BIG_DAY}× the walking
+                        goal.
                       </Text>
                     )}
                     {(!day.strengthDone || day.strengthTicked) && selected <= snapshot!.today && (

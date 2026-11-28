@@ -38,7 +38,7 @@ import type { WorkCalendar } from './calendar';
 import type { WeatherSource } from './weather';
 import { weatherSuggestions, type DayForecast, type WeatherSuggestion } from '../domain/weather';
 import { hardestIn, sessionToRate } from '../domain/effort';
-import { type StrengthTarget, FOCUS_NAME, STRENGTH_XP, strengthDaysIn, strengthDone, strengthDoneDays, strengthFor } from '../domain/strength';
+import { type StrengthTarget, bigDay, FOCUS_NAME, STRENGTH_XP, strengthDaysIn, strengthDone, strengthDoneDays, strengthFor } from '../domain/strength';
 import { planVolume, rebalancedDayKm, recentWeeksKm, typicalWeekKm, weekKm, weekSplit, type WeekVolume } from '../domain/volume';
 import { generateKeySession } from '../domain/sessions';
 import { withCoachFactor } from '../domain/coach';
@@ -284,7 +284,7 @@ export async function refresh(
     const st = daily.meta?.strength;
     if (!st) return p;
     const stDone = strengthDone(st, d, strengthTicks, activities);
-    return { ...p, done: p.done && stDone, strength: { ...st, done: stDone } };
+    return { ...p, done: p.done && (stDone || bigDay(p.value, p.target)), strength: { ...st, done: stDone } };
   };
   const doneOn = (d: DateKey) => !!progressFor(goals.get(d), d)?.done;
   const rf = settings.rideFactor;

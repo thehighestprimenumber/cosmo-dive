@@ -470,4 +470,18 @@ describe('refresh', () => {
     expect(after.days.get(first!.date)?.done).toBe(true);
     expect(after.strength.thisWeek).toContain(first!.date);
   });
+
+  it('a strength day with 2× the walking goal counts without the strength, which moves on', async () => {
+    const db = fakeDb();
+    await migrate(db);
+    const s = { ...settings, strengthInGoal: true };
+    const acts = Array.from({ length: 26 }, (_, i) => walk(addDays('2026-11-02', i), i === 25 ? 200 : 90));
+    const snap = await refresh(db, sourceOf(acts), s, { now: new Date(2026, 10, 27, 20, 0) });
+    const fri = (await loadGoals(db, '2026-11-27', '2026-11-27'))[0];
+    expect(fri.meta?.strength).toBeDefined(); // the strength stayed on through the week
+    expect(snap.days.get('2026-11-26')?.done).toBe(false); // 1.5× isn't enough
+    expect(snap.days.get('2026-11-27')?.done).toBe(true); // 16 km for 4.6
+    expect(snap.strength.thisWeek).toEqual([]);
+  });
+
 });

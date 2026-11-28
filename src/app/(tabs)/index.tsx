@@ -14,7 +14,7 @@ import { sourceFor } from '../../sources';
 import { useApp } from '../../state/AppState';
 import { Button, Card, ProgressBar, styles } from '../../ui/components';
 import { RateCard, StrengthCard } from '../../ui/TodayExtras';
-import { FOCUS_NAME } from '../../domain/strength';
+import { BIG_DAY, bigDay, FOCUS_NAME } from '../../domain/strength';
 import { colors, STATUS_COLOR } from '../../ui/theme';
 
 export default function TodayScreen() {
@@ -166,7 +166,13 @@ export default function TodayScreen() {
               <Text style={styles.body}>
                 {progress.strength.done ? '✅' : '💪'} + {progress.strength.minutes} min of strength ·{' '}
                 {FOCUS_NAME[progress.strength.focus].toLowerCase()}
-                {progress.strength.done ? ' · done' : progress.value >= progress.target ? ' · the part left' : ''}
+                {progress.strength.done
+                  ? ' · done'
+                  : bigDay(progress.value, progress.target)
+                    ? ' · covered by a big day (it moves on)'
+                    : progress.value >= progress.target
+                      ? ` · the part left (or reach ${BIG_DAY}× the goal)`
+                      : ''}
               </Text>
             )}
             {progress.ascent && (

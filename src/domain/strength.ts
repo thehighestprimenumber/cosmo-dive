@@ -17,6 +17,13 @@ const ENOUGH = 0.8;
 /** The earliest day (0 = Monday) for the week's 1st and 2nd session: Tuesday, then Friday. */
 const EARLIEST_DAY = [1, 4];
 
+/**
+ * A strength day where you moved this many times the walking goal counts
+ * without the strength (the strength then stays on for the next days).
+ */
+export const BIG_DAY = 2;
+export const bigDay = (value: number, target: number) => target > 0 && value >= target * BIG_DAY;
+
 export type StrengthFocus = 'lower' | 'upper' | 'full';
 /** Stored with the day's goal (meta.strength): part of that day's goal. */
 export type StrengthTarget = { focus: StrengthFocus; minutes: number };

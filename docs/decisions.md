@@ -6,6 +6,8 @@ Product decisions made while the owner was away, so they can be reviewed and cha
 
 A Friday with 2 h 22 of exercise showed as a rest day with no reason given: it was a strength day without the strength. The calendar's day card now shows the strength part (done / not done) and lets you mark it done on a past day (that day and the streak are redone).
 
+Asked by the owner: **a strength day with 2× the walking goal or more counts without the strength**; the strength isn't counted as done, so it stays on for the next days (`BIG_DAY` in `src/domain/strength.ts`). Applies to past days too (they're recomputed), Friday's 2 h 22 for 41 min included.
+
 ## 2026-11-26: calendar permission
 
 | Topic | Decision | Why / how to change |
