@@ -64,7 +64,7 @@ import type { Activity, DailyGoal, DateKey, DayResult, DayStatus, GoalMeta, Goal
 import type { ActivitySource } from '../sources/ActivitySource';
 
 /** Days that are always re-checked against Health Connect (late syncs, edits, deletions). */
-const RECHECK_DAYS = 35;
+export const RECHECK_DAYS = 35;
 /** Never back-fill more than this many days of goals after a long break. */
 const BACKFILL_MAX_DAYS = 90;
 /** A regular goal on a work day is 70% of the day's share. */
@@ -77,6 +77,9 @@ export type DayView = {
   done: boolean;
   status: DayStatus;
   meta?: GoalMeta;
+  /** Days with strength in the goal: done, and whether by a tick (so it can be unticked). */
+  strengthDone?: boolean;
+  strengthTicked?: boolean;
 };
 
 export type Snapshot = {
@@ -584,7 +587,16 @@ export async function refresh(
 
   const streak = computeStreak(history, today, settings.restDaysPerWeek);
   const days = new Map<DateKey, DayView>(
-    history.map((h) => [h.date, { ...h, status: streak.statuses.get(h.date) ?? 'none' }]),
+    history.map((h) => [
+      h.date,
+      {
+        ...h,
+        status: streak.statuses.get(h.date) ?? 'none',
+        ...(h.meta?.strength
+          ? { strengthDone: strengthDone(h.meta.strength, h.date, strengthTicks, activities), strengthTicked: strengthTicks.includes(h.date) }
+          : {}),
+      },
+    ]),
   );
 
   // Game: XP and level, this month's challenge, achievements (unlocks are stored).

@@ -1,11 +1,15 @@
+import { useSQLiteContext } from 'expo-sqlite';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addDays, mondayOf } from '../../domain/dates';
+import { setExtra } from '../../data/db';
+import { FOCUS_NAME } from '../../domain/strength';
 import { formatMinutes, formatValue, goalEmoji, goalTitle } from '../../domain/format';
 import type { DateKey, DayStatus } from '../../domain/types';
+import { RECHECK_DAYS } from '../../services/sync';
 import { useApp } from '../../state/AppState';
-import { Card, styles } from '../../ui/components';
+import { Button, Card, styles } from '../../ui/components';
 import { colors, STATUS_COLOR } from '../../ui/theme';
 
 const STATUS_LABEL: Record<DayStatus, string> = {
@@ -20,7 +24,13 @@ const STATUS_LABEL: Record<DayStatus, string> = {
 const monthKey = (year: number, month: number): DateKey => `${year}-${String(month + 1).padStart(2, '0')}-01`;
 
 export default function CalendarScreen() {
-  const { snapshot, settings } = useApp();
+  const { snapshot, settings, refresh } = useApp();
+  const db = useSQLiteContext();
+  /** Strength done on a past day you forgot to mark: that day is redone (and the streak with it). */
+  const markStrength = async (date: DateKey, done: boolean) => {
+    await setExtra(db, date, 'strength', done);
+    await refresh({ fullRebuild: date < addDays(snapshot!.today, -RECHECK_DAYS) });
+  };
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const [selected, setSelected] = useState<DateKey | null>(snapshot?.today ?? null);
@@ -127,6 +137,26 @@ export default function CalendarScreen() {
                       ? ` · ${formatMinutes(day.value)} moved`
                       : ''}
                 </Text>
+                {day.meta?.strength && (
+                  <>
+                    <Text style={[styles.body, { marginTop: 6 }]}>
+                      {day.strengthDone ? '✅' : '💪'} + {day.meta.strength.minutes} min of strength ·{' '}
+                      {FOCUS_NAME[day.meta.strength.focus].toLowerCase()} · {day.strengthDone ? 'done' : 'not done'}
+                    </Text>
+                    {!day.strengthDone && (
+                      <Text style={styles.hint}>
+                        The day counts with both the walking goal and the strength part.
+                      </Text>
+                    )}
+                    {(!day.strengthDone || day.strengthTicked) && selected <= snapshot!.today && (
+                      <Button
+                        variant="secondary"
+                        title={day.strengthTicked ? '✓ Strength marked done (undo)' : 'I did the strength: mark done'}
+                        onPress={() => void markStrength(selected, !day.strengthTicked)}
+                      />
+                    )}
+                  </>
+                )}
               </>
             ) : (
               <Text style={styles.muted}>

@@ -2,6 +2,10 @@
 
 Product decisions made while the owner was away, so they can be reviewed and changed. Newest first.
 
+## 2026-11-28: strength shows in the calendar
+
+A Friday with 2 h 22 of exercise showed as a rest day with no reason given: it was a strength day without the strength. The calendar's day card now shows the strength part (done / not done) and lets you mark it done on a past day (that day and the streak are redone).
+
 ## 2026-11-26: calendar permission
 
 | Topic | Decision | Why / how to change |
